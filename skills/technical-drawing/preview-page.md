@@ -8,8 +8,6 @@ Place compact controls near the page edge. Keep color options, downloads and exp
 
 When several drawings are requested, use a small selector. When several views help explain one object, offer a separate view selector.
 
-Use native `<select>` elements for every dropdown, preserving the browser's appearance, arrow and menu. Inherit Inter for their text.
-
 Provide these controls:
 
 | Control | Behavior |
