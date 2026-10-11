@@ -25,6 +25,23 @@ Keep enlarged artwork in a scrollable viewport so every edge remains reachable w
 
 `better-layout` owns responsive arrangement, `better-accessibility` owns control semantics and keyboard behavior, and `better-writing` owns control copy.
 
+## Give the control bar a dark pill shape
+
+Use Inter at `13px` with a fully rounded bar and buttons. Bundle the font locally, including its license, so the page remains self-contained.
+
+Use these values for the bar, keeping the drawing background white:
+
+| Property | Value |
+| --- | --- |
+| Surface | `rgb(20 20 20 / 0.9)` |
+| Bar and button radius | `9999px` |
+| Default text | `rgb(255 255 255 / 0.6)` |
+| Hover text | `rgb(255 255 255 / 0.85)` |
+| Open control | White text on `rgb(255 255 255 / 0.14)` |
+| Shadow | `inset 0 0 0 1px rgb(255 255 255 / 0.1), 0 8px 24px rgb(0 0 0 / 0.25)` |
+
+Center the bar near the bottom edge and account for the device's safe area. Preserve its pill shape when controls wrap on narrow screens.
+
 ## Color the drawing without changing its construction
 
 Start with dark linework on white. Apply color to the entire drawing, with individual-part overrides when the geometry has stable part IDs.
