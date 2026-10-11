@@ -1,11 +1,11 @@
 ---
 name: technical-drawing
-description: Creates precise static technical drawings of physical objects, with coherent views, fine linework and readable annotations. Delivers a zoomable preview page with SVG, PNG and PDF downloads.
+description: Creates precise static technical drawings of physical objects, with coherent views and fine linework. Delivers a blank-page viewer with zoom, editable colors and SVG, PNG and PDF downloads.
 ---
 
 # Technical drawing
 
-This skill creates technical drawing sheets from objects, descriptions, photographs or CAD models. It constructs the geometry, inspects the rendered sheet and packages a page for viewing and downloading the drawing.
+This skill creates technical drawings from objects, descriptions, photographs or CAD models. It constructs the geometry, inspects the rendered drawing and packages a page for viewing, coloring and downloading it.
 
 Treat geometry and annotation correspondence as exact. Treat sheet proportions and line weights as starting recipes, adjusted to the reference and output size.
 
@@ -47,13 +47,13 @@ Choose the smallest view set that answers the request. Read [views-and-annotatio
 | Shape and specified dimensions | Aligned orthographic views |
 | An internal passage or interface | A section through that feature |
 
-For a sheet like an assembly manual, start with landscape A3, a dominant exploded view, a compact assembled view and a parts list. Change orientation to suit the object.
+Default to the object alone on a blank page, with one selected view visible. Offer a view switcher when both assembled and exploded views help.
 
-Reserve room for annotations before adding detail. Allocate the lower band to the title block and the perimeter to callouts. Keep those areas out of the geometry's fitted bounds.
+When the user requests an annotated sheet, reserve annotation space before adding detail. Landscape A3 with a dominant exploded view, assembled inset and parts list suits an assembly manual.
 
 Use a static composition that carries its explanation at a glance. Keep object animation and simulation out of scope unless requested.
 
-This step is done when each view has a purpose, a scale policy and an allocated rectangle on the sheet.
+This step is done when each view has a purpose and a scale policy. Annotated sheets also need allocated rectangles for their views and labels.
 
 ## 3. Construct one object, then project it
 
@@ -80,23 +80,23 @@ Render an early geometry proof before laying out labels. Inspect both the assemb
 
 This step is done when corresponding features agree across views and every separated component has a credible place in the assembled object.
 
-## 4. Ink the sheet and attach annotations
+## 4. Ink the drawing and add requested annotations
 
 Use [sheet-and-svg.md](sheet-and-svg.md) for paper dimensions, line roles, SVG structure and export mechanics. Its values are a monochrome starting palette for an assembly print.
 
 Draw component edges with a consistent hierarchy. Let changes in line weight, visibility and spacing describe depth. Use hatching only for sectioned material.
 
-For assemblies, place item balloons outside the silhouette and anchor each leader to a specific visible feature. Match their IDs to the parts inventory, including quantities for repeated hardware.
+For annotated assemblies, place item balloons outside the silhouette and anchor each leader to a specific visible feature. Match their IDs to the parts inventory, including quantities for repeated hardware.
 
-Lay out actual labels before finalizing view positions. Adjust the view or route the leader when text collides, rather than shrinking annotations until they disappear.
+When labels are requested, lay them out before finalizing view positions. Adjust the view or route the leader when text collides, rather than shrinking annotations until they disappear.
 
-Include only useful sheet metadata. A title, view names, drawing identifier and sheet number often suffice. Add units, scale and revision only when their values are meaningful.
+Keep borders, titles, callouts and parts tables out of the default artwork. On requested technical sheets, add only metadata with established values.
 
 Keep sheet notes about the object and its assembly. Put rendering methods and verification details in the delivery message.
 
-Give an illustrative reconstruction or concept one visible status note on the sheet. Leave unknown tolerances, material specifications, approval signatures and compliance claims absent.
+Identify illustrative construction in the viewer's information or download panel and exported metadata. On annotated sheets, include one visible status note. Leave unknown tolerances, material specifications, approval signatures and compliance claims absent.
 
-This step is done when every annotation can be traced to its feature and the sheet remains readable at its intended size.
+This step is done when the drawing remains clear at its intended size and every requested annotation can be traced to its feature.
 
 ## 5. Render, inspect and correct
 
@@ -110,11 +110,11 @@ If rendering is unavailable, deliver the editable source and explicitly mark vis
 
 ## 6. Package and test the preview page
 
-Read [preview-page.md](preview-page.md) to build the viewer and connect its downloads. Keep the drawing source shared between the displayed sheet and every export.
+Read [preview-page.md](preview-page.md) to build the viewer and connect its downloads. Keep the drawing source and color choices shared between the displayed view and every export.
 
 Use the project's existing interface components when integrating there. For a standalone deliverable, create a local HTML page that opens without a build step or running server.
 
-This step is done when zoom works and every available download has been opened and checked. Report unavailable formats or unverified browser behavior explicitly.
+This step is done when zoom and color changes work, and every available download preserves the selected view and colors. Report unavailable formats or unverified browser behavior explicitly.
 
 ## Before you finish
 
@@ -124,11 +124,11 @@ This step is done when zoom works and every available download has been opened a
 | A rib or hole count changes between views | Generate both views from the same inventory and geometry |
 | The separated parts look like unrelated floating objects | Revisit their assembled placements and explosion paths |
 | Balloons appear inside cavities or leaders cross labels | Move the callout lane and reconnect the anchored endpoints |
-| The thumbnail is mostly border, legend or tiny text | Give the object more sheet area and remove unused furniture |
+| A gallery, sidebar or framed sheet surrounds the default drawing | Return to the blank-page viewer described in [preview-page.md](preview-page.md) |
 | A title block claims a scale the fitted view cannot preserve | Use `NTS`, or compute and verify the physical output scale |
 | A photograph becomes an unexplained detailed interior | Remove unsupported construction or mark it as illustrative |
 | Slots merge into black bars in the preview | Enlarge the view, simplify the feature or make a detail inset |
-| A download contains the toolbar or only the zoomed crop | Export the complete drawing source, outside the viewer layout |
+| A download loses chosen colors or contains only the zoomed crop | Export the complete selected view from its current drawing state |
 | PDF download opens a print dialog | Generate a PDF file or label the action as printing |
 
 ## Deliver the drawing with its source

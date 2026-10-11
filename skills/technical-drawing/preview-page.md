@@ -1,8 +1,12 @@
-# View the sheet and download the drawing
+# View, color and download the drawing
 
 ## Keep the page centered on the drawing
 
-Give the sheet most of the viewport. Place a compact title, sheet size and controls above it, keeping interface chrome outside the artwork.
+Use a continuous white page with the object centered directly on it. Default to a single selected view, without a gallery, sidebar, header, sheet border or contrasting canvas.
+
+Place compact controls near the page edge. Keep color options, downloads and explanatory text in panels that open on demand.
+
+When several drawings are requested, use a small selector. When several views help explain one object, offer a separate view selector.
 
 Provide these controls:
 
@@ -10,25 +14,40 @@ Provide these controls:
 | --- | --- |
 | Zoom out and Zoom in | Change viewing magnification without changing the drawing |
 | Fit | Restore the whole-sheet view and recalculate it when the viewport changes |
+| Color | Open line-color presets, a custom picker and a reset action |
 | Download SVG | Save the editable vector source |
 | Download PNG | Save the full sheet at the stated pixel dimensions |
 | Download PDF | Save the full vector sheet at its physical page size |
 
 Show the zoom percentage and bound its range. A useful starting range is 25–400% of fitted size, with `Fit` labeled separately from physical scale.
 
-Keep oversized sheets inside a scrollable viewport so every edge remains reachable with a keyboard or touch. Let controls wrap above that viewport on narrow screens.
+Keep enlarged artwork in a scrollable viewport so every edge remains reachable with a keyboard or touch. Reserve space for controls, including their wrapped height on narrow screens.
 
 `better-layout` owns responsive arrangement, `better-accessibility` owns control semantics and keyboard behavior, and `better-writing` owns control copy.
 
-## Build every download before presenting it
+## Color the drawing without changing its construction
+
+Start with dark linework on white. Apply color to the entire drawing, with individual-part overrides when the geometry has stable part IDs.
+
+Keep matching parts the same color across views. Retain stroke widths, hidden-line patterns, hatching and white occluding faces when changing line colors.
+
+Name the edited property explicitly, such as `Line color`. A surface-fill option requires actual closed surface geometry; open contours cannot be filled reliably.
+
+Keep color choices in drawing state alongside the selected view. Reset restores the original appearance without changing geometry or zoom.
+
+`better-colors` owns palette choices and rendered contrast. Decorative part colors do not imply established materials or safety classifications.
+
+## Export the selected view and colors
 
 Generate the files from the finished drawing using **Export from the same source** in [sheet-and-svg.md](sheet-and-svg.md). Give them consistent filenames, such as `microphone.svg`, `microphone.png` and `microphone.pdf`.
 
-Preserve a canonical SVG string or byte array independently of the viewer DOM. Use it for the displayed sheet and the exported SVG.
+Preserve source geometry independently of the viewer layout. Serialize the selected view and current colors into one SVG, then derive every export from that representation.
 
 Viewing zoom and scrolling must never change the download. Rasterize the complete SVG at the chosen resolution, excluding the toolbar and surrounding page.
 
-Create the PDF before wiring its download. Browser printing can generate it during authoring, with the drawing isolated on a page of the correct physical size.
+Generate editable-color exports on demand, or refresh them after each edit. A download must reflect the visible color state rather than an earlier monochrome file.
+
+Use a vector-capable PDF exporter that supports the drawing's paths, clipping and styles. Bundle required runtime libraries locally for offline use.
 
 `window.print()` opens a dialog; it does not produce a downloadable PDF by itself. If printing is offered separately, label it `Print`.
 
@@ -38,9 +57,9 @@ If a renderer is unavailable, explain which format could not be produced and exp
 
 Package `index.html` beside the exports and generator. Keep runtime scripts, styles and preview assets local, using the existing project setup only when the user requested integration.
 
-For a self-contained page, embed export bytes in its build output and create Blob URLs at runtime. This avoids fetching neighboring files from an opaque `file:` origin.
+For a self-contained page, embed source SVG, scripts and required assets in its build output. This avoids fetching neighboring files from an opaque `file:` origin.
 
-An embedded base64 payload can supply an ordinary download link:
+Prebuilt formats can supply an ordinary download link from embedded bytes:
 
 ```js
 function attachDownload(link, { base64, type, filename }) {
@@ -70,9 +89,9 @@ A CSS transform alone does not reserve the enlarged sheet's layout space. Resize
 
 ## Test the controls and the downloaded bytes
 
-Open the generated page from disk and exercise zoom, Fit and every download. Test a wide viewport and a narrow one, including keyboard access to the controls.
+Open the generated page from disk and exercise zoom, Fit, color selection, reset and every download. Test wide and narrow viewports, including keyboard access and panel dismissal.
 
-Download again after zooming and scrolling. Confirm that each saved file still contains the entire sheet, and that the SVG matches the canonical source.
+Change whole-drawing and individual-part colors, then switch views where available. Download after zooming and scrolling, confirming that every format preserves the complete selected view and its colors.
 
 Check PNG pixel dimensions and PDF page count, size and vector content. Render the downloaded PDF independently and inspect its labels, fine lines and sheet edges.
 
