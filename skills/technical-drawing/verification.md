@@ -8,6 +8,8 @@ Read every label at that size. If it requires zoom, enlarge the label, enlarge t
 
 At 3–4×, inspect every crowded junction and curved contour. Look for faceting, lines through solid faces, doubled edges, mismatched tangencies and leaders ending in empty space.
 
+Check that a cylinder's rim arcs connect through both silhouette edges. A missing side can appear only at particular camera angles or tessellation counts.
+
 Check the preview against the reference's visual grammar. Judge line density, paper use and annotation restraint separately from whether the subject itself matches.
 
 ## Trace every correspondence
@@ -18,6 +20,9 @@ Check the preview against the reference's visual grammar. Judge line density, pa
 | Multiple views | Feature counts and shared coordinates agree across projections |
 | Section | Every hatch region is solid material at the stated cut; openings remain clear |
 | Dimensioned drawing | Every label comes from a model parameter with known units |
+| Parameterized object | Minimum, default and maximum settings preserve mating features, quantities and corresponding views |
+| Isolated part | Previously occluded geometry reappears and the export contains only the selected component |
+| Adjustable explosion | Zero reconstructs the assembly; intermediate and maximum spacing preserve insertion axes |
 | Numbered assembly | Each balloon resolves to one item; every listed item is represented; quantities match the assembly |
 
 An intentionally omitted item needs a note. A parts list cannot quietly count hardware that the drawing never represents.

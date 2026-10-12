@@ -63,6 +63,8 @@ Derive every view from that model, including the parts list when the drawing nee
 
 Use the target project's existing tools. Prefer CAD projection when a model exists or curved intersections need hidden-line removal. For illustrative geometry, [geometry.md](geometry.md) gives a lightweight SVG construction method.
 
+For repeated mechanical features or editable dimensions, use [geometry-library.md](geometry-library.md). It covers reusable primitives, parameter relationships and the bundled projection helper.
+
 Keep contours, annotations and hatching as editable vector elements.
 
 Keep model coordinates separate from paper coordinates. Change a view's camera, scale and explosion offsets without redrawing the object independently.
@@ -110,11 +112,11 @@ If rendering is unavailable, deliver the editable source and explicitly mark vis
 
 ## 6. Package and test the preview page
 
-Read [preview-page.md](preview-page.md) to build the viewer and connect its downloads. Keep the drawing source and color choices shared between the displayed view and every export.
+Read [preview-page.md](preview-page.md) to build the viewer and connect its downloads. Use [viewer-assets.md](viewer-assets.md) when starting from the bundled standalone viewer. Keep the drawing source and color choices shared between the displayed view and every export.
 
 Use the project's existing interface components when integrating there. For a standalone deliverable, create a local HTML page that opens without a build step or running server.
 
-This step is done when zoom and color changes work, and every available download preserves the selected view and colors. Report unavailable formats or unverified browser behavior explicitly.
+This step is done when the available controls work and every download preserves the selected geometry, linework and colors. Report unavailable formats or unverified browser behavior explicitly.
 
 ## Before you finish
 
