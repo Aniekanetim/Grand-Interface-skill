@@ -85,6 +85,8 @@ Deliver the resulting HTML alongside the configuration, model scripts, dependenc
 
 [assets/theme.js](assets/theme.js) resolves system appearance and saved overrides before the page paints. Run `node scripts/test-theme.cjs` from the skill directory after changing appearance behavior.
 
-[assets/worker.js](assets/worker.js) runs model generation away from the controls. Newer render requests supersede older results, and downloads wait for the current drawing.
+[assets/worker.js](assets/worker.js) runs model generation away from the controls. [assets/render-queue.js](assets/render-queue.js) keeps one active job and only the latest queued preview, while preserving captured export requests.
+
+Downloads wait for the current drawing. Run `node scripts/test-render-queue.cjs` from the skill directory after changing request scheduling.
 
 Use [verification.md](verification.md) for geometry checks and [preview-page.md](preview-page.md) for browser and downloaded-file checks. Run `node scripts/test-viewer-builder.cjs` from the skill directory after changing packaging. Successful bundling does not establish visual correctness.

@@ -14,7 +14,7 @@ try{
  const configPath=path.join(root,'drawing.json'),output=path.join(root,'dist/index.html');fs.writeFileSync(configPath,JSON.stringify(config));build(configPath,output);
  const html=fs.readFileSync(output,'utf8'),scripts=[...html.matchAll(/<script([^>]*)>([\s\S]*?)<\/script>/g)];
  const data=JSON.parse(scripts.find(s=>s[1].includes('id="drawing-data"'))[2]);assert.equal(data[0].title,title,'Embedding must preserve text without creating script elements');
- const executable=scripts.filter(s=>!s[1].includes('type='));assert.equal(executable.length,5,'Only the intended theme, libraries and viewer scripts execute');
+ const executable=scripts.filter(s=>!s[1].includes('type='));assert.equal(executable.length,6,'Only the intended theme, libraries, queue and viewer scripts execute');
  assert.ok(executable[0][2].includes('globalThis.DrawingTheme='));assert.ok(html.indexOf(executable[0][0])<html.indexOf('<style>'),'Appearance must initialize before the page paints');
  const environment={};vm.runInNewContext(executable[1][2],environment);vm.runInNewContext(executable[2][2],environment);assert.equal(environment.jspdf.loaded,true);assert.equal(environment.svg2pdf.loaded,true,'PDF export dependency must be embedded');
  for(const s of executable)new vm.Script(s[2]);

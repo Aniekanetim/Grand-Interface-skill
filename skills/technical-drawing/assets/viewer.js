@@ -6,15 +6,12 @@ const presets={technical:{outline:.35,edge:.22,detail:.13,texture:.09},patent:{o
 const storageKey='object-studies-colors-v2';
 let preferences={};try{preferences=JSON.parse(localStorage.getItem(storageKey)||'{}');}catch{}
 const states=new Map(drawings.map(d=>[d.id,{params:Object.fromEntries(d.parameters.map(p=>[p.key,p.default])),explosion:(d.initialView??(d.parts.length===1?'assembled':'exploded'))==='assembled'?0:1,preset:'technical',selectedPart:'all',isolated:null}]));
-let selected=drawings.find(d=>d.id===location.hash.slice(1))||drawings[0],zoom=1,svg,geometry,geometryScale=1,messageTimer,renderTimer,requestId=0,renderBusy=false,exportBusy=false;
+let selected=drawings.find(d=>d.id===location.hash.slice(1))||drawings[0],zoom=1,svg,geometry,geometryScale=1,messageTimer,renderTimer,renderBusy=false,exportBusy=false;
 let renderedState=null;
 const workerUrl=URL.createObjectURL(new Blob([JSON.parse($('drawing-worker').textContent)],{type:'text/javascript'}));
-const renderer=new Worker(workerUrl);URL.revokeObjectURL(workerUrl);
+const renderer=DrawingRenderQueue.create(new Worker(workerUrl));URL.revokeObjectURL(workerUrl);
 const state=()=>states.get(selected.id);
-const pending=new Map();
-function requestGeometry(id,snapshot){return new Promise((resolve,reject)=>{const request=++requestId;pending.set(request,{resolve,reject});renderer.postMessage({request,id,parameters:snapshot.params,explosion:snapshot.explosion,isolated:snapshot.isolated});});}
-renderer.onmessage=({data})=>{const job=pending.get(data.request);if(!job)return;pending.delete(data.request);if(data.error)job.reject(Error(data.error));else job.resolve(data.result);};
-renderer.onerror=event=>{for(const job of pending.values())job.reject(Error(event.message||'Drawing worker failed'));pending.clear();};
+function requestGeometry(id,snapshot,preview=false){return renderer.request({id,parameters:snapshot.params,explosion:snapshot.explosion,isolated:snapshot.isolated},{preview});}
 function colors(){return preferences[selected.id]||(preferences[selected.id]={base:'#202020',parts:{}});}
 function save(){try{localStorage.setItem(storageKey,JSON.stringify(preferences));}catch{}}
 function announce(text,persistent=false){clearTimeout(messageTimer);$('message').textContent=text;if(!persistent)messageTimer=setTimeout(()=>{$('message').textContent='';},5000);}
@@ -52,7 +49,7 @@ let revision=0;
 async function renderGeometry(){
  const version=++revision,subject=selected,target=snapshot();renderBusy=true;updateAvailability();viewport.setAttribute('aria-busy','true');$('render-status').textContent='Updating drawing';
  try{
-  const result=await requestGeometry(subject.id,target);if(version!==revision)return;
+  const result=await requestGeometry(subject.id,target,true);if(version!==revision)return;
   const mounted=mountGeometry(result,subject,target);svg=mounted.node;geometry=mounted.group;drawing.replaceChildren(svg);geometryScale=fitGeometry(geometry);
   styleGeometry(geometry,geometryScale,subject,state());renderedState={subject:subject.id,...target};updateSelection();renderZoom();
   document.title=subject.title+' · Technical drawing';$('render-status').textContent='Drawing updated';
@@ -60,7 +57,7 @@ async function renderGeometry(){
  finally{if(version===revision){renderBusy=false;viewport.setAttribute('aria-busy','false');updateAvailability();}}
 }
 function scheduleRender(){
- clearTimeout(renderTimer);++revision;renderBusy=true;updateAvailability();viewport.setAttribute('aria-busy','true');renderTimer=setTimeout(renderGeometry,120);
+ clearTimeout(renderTimer);++revision;renderer.cancelPreview();renderBusy=true;updateAvailability();viewport.setAttribute('aria-busy','true');renderTimer=setTimeout(renderGeometry,120);
 }
 function renderNow(){clearTimeout(renderTimer);return renderGeometry();}
 function updateAvailability(){

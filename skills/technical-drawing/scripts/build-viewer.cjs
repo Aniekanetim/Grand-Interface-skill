@@ -29,6 +29,7 @@ function build(configPath,outputPath){
   '__WORKER_SOURCE__':json(worker),
   '__THEME_SCRIPT__':script(read(path.join(assets,'theme.js'))),
   '__EXPORT_SCRIPT__':script(read(path.join(assets,'export.js'))),
+  '__RENDER_QUEUE_SCRIPT__':script(read(path.join(assets,'render-queue.js'))),
   '__VIEWER_SCRIPT__':script(read(path.join(assets,'viewer.js')))
  };
  const html=read(path.join(assets,'viewer.html')).replace(/__[A-Z0-9_]+__/g,key=>{if(!(key in replacements))throw Error('Unknown template token '+key);return replacements[key];});
