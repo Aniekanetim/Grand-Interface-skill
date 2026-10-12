@@ -10,8 +10,8 @@ The helpers run in Node through `require()` and in a browser or worker through `
 
 | Helper | Inputs and result |
 | --- | --- |
-| `lathe(part, profile, options)` | Revolves a closed `[x, radius]` profile around X; inner profile segments form actual bores |
-| `ring(part, x, radius, width)` | Adds a circular feature line perpendicular to X |
+| `lathe(part, profile, options)` | Revolves a closed `[x, radius]` profile around X; inner profile segments form actual bores, and a third value of `'h'` makes that point hexagonal |
+| `ring(part, x, radius, role, kind)` | Adds a circular feature line perpendicular to X, or a hexagonal one with `kind` set to `'h'` |
 | `helix(part, options)` | Adds a thread line from `x0` to `x1` with `radius`, `pitch` and optional handedness |
 | `spring(part, options)` | Builds closed wire around X from `radius`, `wire`, `turns`, `x0` and `x1` |
 | `knurl(part, options)` | Adds crossing helices using `starts`, `pitch`, `radius`, `x0` and `x1` |
@@ -61,10 +61,10 @@ Use this mesh contract when a verified construction needs surfaces beyond the he
 | --- | --- |
 | `vertices` | Finite `[x, y, z]` positions in assembled model coordinates |
 | `triangles` | Three zero-based vertex indices per face, consistently wound toward the surface's outside |
-| `lines` | Feature segments with `a` and `b` endpoints, a line-role width and optional `detail` classification |
+| `lines` | Feature segments with `a` and `b` endpoints and a line `role` |
 | `explosion` | A translation applied to the complete part, independent of its assembled position |
 
-Add feature lines through `line(part, a, b, width, detail)`. Widths select roles: at least 0.30 for outlines, 0.20 for edges, at most 0.105 for texture and intermediate values for detail.
+Add feature lines through `line(part, a, b, role)`. The role is `outline`, `edge`, `detail` or `texture` and defaults to `edge`. Helpers that add lines take the same `role` option.
 
 Share vertex indices across adjacent faces so silhouette detection can compare their normals. Triangulation diagonals belong only in the mesh, never in feature lines.
 
@@ -85,7 +85,7 @@ For upright objects, set `camera: {azimuth: -135, elevation: 20, roll: 0}` in th
 
 Zero roll keeps vertical edges vertical. The default camera retains the original isometric elevation and 16° roll; choose a view that reveals the object's important surfaces.
 
-`project(point, camera)` accepts the same angles for feature anchors. Keep camera changes out of model coordinates so geometry and explosion vectors remain in one physical frame.
+`project(point, camera)` accepts the same angles for feature anchors. For many anchors, build the camera once with `createCamera(camera)` and call its `project`. Keep camera changes out of model coordinates so geometry and explosion vectors remain in one physical frame.
 
 The render result includes `scale` and `offset` for paper placement. Map an anchor with `project(anchor, camera).slice(0, 2).map((n, i) => n * result.scale + result.offset[i])`.
 
@@ -93,7 +93,7 @@ Add its part's current explosion translation before projecting the anchor. This 
 
 The result contains named part groups and paths carrying `data-line-role`. Roles are `outline`, `edge`, `detail` and `texture`; the viewer supplies their ink styles.
 
-Coordinates fit a landscape A3 page. `explosion` accepts 0–2, while `isolated` accepts one part ID or `null` for the complete assembly.
+Coordinates fit a landscape A3 page with a 28 mm margin, which is the paper space the viewer expects. `explosion` accepts 0–2, while `isolated` accepts one part ID or `null` for the complete assembly.
 
 The renderer samples visibility at 0.045 mm on paper by default. Its depth tolerance tracks 0.01 mm on paper, so inspect shallow recesses and nearly touching faces closely.
 

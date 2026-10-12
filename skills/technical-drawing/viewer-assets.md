@@ -67,7 +67,7 @@ Mark filled ink, including engraved text and arrowheads, with `data-ink-fill`. T
 
 Keep occluding faces unmarked and explicitly paper-colored. A filled-ink marker identifies content to recolor, not every closed surface.
 
-The viewer fits geometry uniformly and compensates stroke widths for that scale. Model scripts handle `explosion` and `isolated` before projecting, including newly exposed surfaces.
+Return coordinates in millimeters on the 420 × 297 mm sheet. `TechnicalProjection.render` already fits them, and the viewer draws them unscaled. Model scripts handle `explosion` and `isolated` before projecting, including newly exposed surfaces.
 
 Treat model code as generator source you control. Sanitize imported SVG before it reaches this boundary, following [preview-page.md](preview-page.md).
 
@@ -85,7 +85,7 @@ Deliver the resulting HTML alongside the configuration, model scripts, dependenc
 
 [assets/theme.js](assets/theme.js) resolves system appearance and saved overrides before the page paints. Run `node scripts/test-theme.cjs` from the skill directory after changing appearance behavior.
 
-[assets/worker.js](assets/worker.js) runs model generation away from the controls. [assets/render-queue.js](assets/render-queue.js) keeps one active job and only the latest queued preview, while preserving captured export requests.
+[assets/worker.js](assets/worker.js) runs model generation away from the controls. [assets/render-queue.js](assets/render-queue.js) runs one job at a time. A newer preview supersedes queued and running previews, an optional delay debounces slider input and captured export requests always run.
 
 Downloads wait for the current drawing. Run `node scripts/test-render-queue.cjs` from the skill directory after changing request scheduling.
 
