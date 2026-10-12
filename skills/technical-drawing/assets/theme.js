@@ -1,4 +1,3 @@
-// Apply the saved appearance before the first paint. Drawing colors stay in the SVG.
 globalThis.DrawingTheme=(()=>{
  const key='technical-drawing-appearance',root=document.documentElement;
  const system=matchMedia('(prefers-color-scheme: dark)'),listeners=new Set();

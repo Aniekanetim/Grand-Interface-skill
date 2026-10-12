@@ -1,4 +1,3 @@
-/* Keep obsolete previews out of the worker without cancelling captured exports. */
 (function(root){
 function create(worker) {
   let active = null, preview = null, failure = null, requestId = 0;

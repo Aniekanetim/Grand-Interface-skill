@@ -1,4 +1,3 @@
-/* Export an immutable, complete SVG snapshot. The toolbar never enters this module. */
 (function(root){
 const ns='http://www.w3.org/2000/svg';
 function prepare(svg,{crop=false,transparent=false,bounds,metadata={}}={}){

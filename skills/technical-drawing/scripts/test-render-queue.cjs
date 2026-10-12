@@ -23,7 +23,6 @@ const target = length => ({params:{length},explosion:0,isolated:null});
 const outcome = promise => promise.then(value=>({value}),error=>({error}));
 
 async function run() {
-  // Calls represent separate debounce firings while a slow projection is still active.
   const {worker,request} = viewerBoundary();
   const first = outcome(request('fixture',target(1),true));
   const stale = outcome(request('fixture',target(2),true));
@@ -36,7 +35,6 @@ async function run() {
   assert.equal((await first).value.markup,'first');
   assert.equal((await latest).value.markup,'latest');
 
-  // Exercise the actual debounce and render functions, including stale-error handling.
   const ui = viewerBoundary(), timers = new Map(), mounted = [], notices = [];
   let timerId = 0, busy;
   Object.assign(ui.context,{
@@ -95,7 +93,7 @@ async function run() {
   const debouncing = viewerBoundary();
   const active = outcome(debouncing.request('fixture',target(1),true));
   const obsolete = outcome(debouncing.request('fixture',target(2),true));
-  debouncing.cancel(); // A new input invalidates queued work before its 120 ms debounce fires.
+  debouncing.cancel();
   assert.equal((await obsolete).error.name,'AbortError');
   debouncing.worker.complete(0,{markup:'active'});
   assert.equal(debouncing.worker.sent.length,1,'The previous queued state must not start during a newer debounce');

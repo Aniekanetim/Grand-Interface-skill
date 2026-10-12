@@ -1,4 +1,3 @@
-/* Sampled hidden-line projection for small illustrative meshes, not a CAD kernel. */
 (function(root){
   'use strict';
   const G=typeof module!=='undefined'&&module.exports?require('./geometry.js'):root.TechnicalGeometry;
@@ -21,7 +20,6 @@
       const length=Math.hypot(...n);if(length<=Math.hypot(...ab)*Math.hypot(...ac)*1e-12)continue;
       for(let j=0;j<3;j++){const a=f[j],b=f[(j+1)%3],key=a<b?`${a}:${b}`:`${b}:${a}`;if(!edges.has(key))edges.set(key,{a,b,signs:[]});edges.get(key).signs.push(dot(n,direction)/length);}
     }
-    // An edge-on face still borders a silhouette. Visibility removes its rear duplicate.
     return [...edges.values()].filter(e=>{const low=Math.min(...e.signs),high=Math.max(...e.signs);return low<=1e-8&&high>=-1e-8&&(low<-1e-8||high>1e-8);}).map(({a,b})=>({a:part.vertices[a],b:part.vertices[b],width:.35}));
   }
   function render(parts,{explosion=1,isolated=null,sample=.045,camera}={}){

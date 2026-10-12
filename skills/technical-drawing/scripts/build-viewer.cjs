@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-// Usage: node build-viewer.cjs drawing.json output/index.html
 const fs=require('node:fs'),path=require('node:path');
 function build(configPath,outputPath){
  const base=path.dirname(path.resolve(configPath)),config=JSON.parse(fs.readFileSync(configPath,'utf8'));

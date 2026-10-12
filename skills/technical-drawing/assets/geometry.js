@@ -1,4 +1,3 @@
-/* Small illustrative geometry helpers. Model units are chosen by the caller. */
 (function (root) {
   'use strict';
   const TAU = Math.PI * 2;
@@ -43,7 +42,6 @@
       line(p,point(TAU*j/n),point(TAU*(j+1)/n),width);
     }
   }
-  // A closed radial profile creates both outer walls and actual inner bores.
   function lathe(p, profile, {segments=144, start=0, end=TAU, omitRings=[], width=.22} = {}) {
     count(segments, 12, 720);
     if(profile.some(p=>p[2]==='h') && segments%12!==0)throw Error('Hex profiles need a segment count divisible by 12');
@@ -66,7 +64,6 @@
       if (profile[i][2]==='h' && profile[k][2]==='h') for (let j=segments/12;j<cols;j+=segments/6) line(p,p.vertices[idx(i,j)],p.vertices[idx(k,j)],width);
     }
     if (partial) for (const side of [0,cols-1]) {
-      // Sector end caps require a convex radial profile.
       for(let i=1;i<profile.length-1;i++) p.triangles.push([idx(0,side),idx(i,side),idx(i+1,side)]);
       for(let i=0;i<profile.length;i++) line(p,p.vertices[idx(i,side)],p.vertices[idx((i+1)%profile.length,side)],width);
     }
@@ -146,7 +143,6 @@
     for(const l of source.lines)target.lines.push({...l,a:[...l.a],b:[...l.b]});
     return target;
   }
-  // A simple, concave outline is supported. Holes and intersecting contours need CAD.
   function extrude(p,profile,{depth,width=.22,creaseAngle=25}={}) {
     positive(depth);positive(width);finite(creaseAngle);
     if(creaseAngle<0||creaseAngle>180)throw Error('Invalid crease angle');
@@ -157,7 +153,6 @@
     const points=profile.filter((v,i)=>!i||!same(v,profile[i-1])).map(v=>[...v]);
     if(points.length>1&&same(points[0],points.at(-1)))points.pop();
     const turn=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]),areaTolerance=epsilon*span;
-    // Remove straight-through samples without deleting corners.
     for(let i=points.length-1;i>=0&&points.length>3;i--){const a=points[(i+points.length-1)%points.length],b=points[i],c=points[(i+1)%points.length];if(Math.abs(turn(a,b,c))<=areaTolerance&&(b[0]-a[0])*(c[0]-b[0])+(b[1]-a[1])*(c[1]-b[1])>=0)points.splice(i,1);}
     const onSegment=(a,b,c)=>Math.abs(turn(a,b,c))<=areaTolerance&&c[0]>=Math.min(a[0],b[0])-epsilon&&c[0]<=Math.max(a[0],b[0])+epsilon&&c[1]>=Math.min(a[1],b[1])-epsilon&&c[1]<=Math.max(a[1],b[1])+epsilon;
     for(let i=0;i<points.length;i++)for(let j=i+1;j<points.length;j++){
