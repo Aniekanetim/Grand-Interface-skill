@@ -83,8 +83,7 @@ Generate the role rules where the shell's comment sits, from the sheet module ra
 
 ```js
 const SHEET = require('./tools/technical-drawing/assets/sheet.js');
-const roles = Object.entries(SHEET.linework.technical).map(([role, width]) => `[data-line-role="${role}"] { stroke-width: ${width}; }`).join('\n');
-const axis = `[data-line-role="axis"] { stroke-dasharray: ${SHEET.axisDash}; }`;
+const roles = SHEET.css('technical');
 ```
 
 Generate projected coordinates directly in sheet space when possible. Nested scale transforms otherwise multiply stroke widths along with geometry. To inset a rendered view at a smaller size, wrap its markup in a translate and scale transform and divide its stroke widths by that scale.

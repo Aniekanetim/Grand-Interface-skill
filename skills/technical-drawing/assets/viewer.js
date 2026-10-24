@@ -9,7 +9,7 @@ const storageKey = 'technical-drawing-colors-v3';
 
 const defaultInk = () => ({base: null, parts: {}});
 const defaultParams = d => Object.fromEntries(d.parameters.map(p => [p.key, p.default]));
-const slug = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+const previewFit = explosion => explosion && Math.max(explosion, 1);
 
 function inkFromHue(hue) {
   const angle = hue * Math.PI / 180, a = HUE_INK.chroma * Math.cos(angle), b = HUE_INK.chroma * Math.sin(angle);
@@ -62,8 +62,7 @@ function createSvg(name, attributes = {}) {
   return node;
 }
 
-function requestGeometry(subject, target, options) {
-  const fitExplosion = options?.preview && target.explosion ? Math.max(target.explosion, 1) : target.explosion;
+function requestGeometry(subject, target, fitExplosion, options) {
   return renderer.request({id: subject.id, parameters: target.params, explosion: target.explosion, fitExplosion, isolated: target.isolated}, options);
 }
 
@@ -72,7 +71,7 @@ function mountGeometry(result, subject, target) {
     xmlns: ns, width: SHEET.width + 'mm', height: SHEET.height + 'mm', viewBox: `0 0 ${SHEET.width} ${SHEET.height}`,
     role: 'img', 'aria-labelledby': 'art-title art-description'
   });
-  const part = subject.parts.find(p => String(p.id) === String(target.isolated));
+  const part = subject.parts.find(p => p.id === target.isolated);
   const title = createSvg('title', {id: 'art-title'});
   title.textContent = subject.title + ' · ' + (part ? part.name : (target.explosion ? 'exploded' : 'assembled') + ' view');
   const desc = createSvg('desc', {id: 'art-description'});
@@ -126,7 +125,7 @@ async function render(delay = 0) {
   setDrawingStatus('rendering');
   try {
     const target = structuredClone(state());
-    const mounted = mountGeometry(await requestGeometry(subject, target, {preview: true, delay}), subject, target);
+    const mounted = mountGeometry(await requestGeometry(subject, target, previewFit(target.explosion), {preview: true, delay}), subject, target);
     svg = mounted.node;
     geometry = mounted.group;
     drawing.replaceChildren(svg, selection);
@@ -184,7 +183,18 @@ function syncControls() {
   $('isolate-part').setAttribute('aria-pressed', String(isolated));
   $('isolate-part').textContent = isolated ? 'Isolated' : 'Isolate';
   $('parts-toggle').setAttribute('aria-pressed', String(s.selectedPart !== 'all'));
+  for (const p of selected.parameters) {
+    const input = $('parameter-' + p.key);
+    input.value = s.params[p.key];
+    $('value-' + p.key).textContent = input.value + (p.unit ? ' ' + p.unit : '');
+  }
   updateAvailability();
+}
+
+function refresh() {
+  syncControls();
+  updateColorControls();
+  render();
 }
 
 function updateSelection() {
@@ -235,11 +245,8 @@ function buildParameterControls() {
     value.id = 'value-' + p.key;
     value.htmlFor = 'parameter-' + p.key;
     const input = document.createElement('input');
-    Object.assign(input, {type: 'range', id: 'parameter-' + p.key, min: p.min, max: p.max, step: p.step || 1, value: state().params[p.key]});
-    const show = () => { value.textContent = input.value + (p.unit ? ' ' + p.unit : ''); };
-    show();
+    Object.assign(input, {type: 'range', id: 'parameter-' + p.key, min: p.min, max: p.max, step: p.step || 1});
     input.addEventListener('input', () => {
-      show();
       update({params: {...state().params, [p.key]: Number(input.value)}}, {delay: RENDER_DELAY});
     });
     row.append(label, value);
@@ -257,10 +264,8 @@ function selectDrawing(id) {
   }
   const assembly = selected.parts.length > 1;
   for (const control of ['view', 'spacing-field']) $(control).hidden = !assembly;
-  syncControls();
   buildParameterControls();
-  updateColorControls();
-  render();
+  refresh();
   history.replaceState(null, '', '#' + selected.id);
 }
 
@@ -305,10 +310,7 @@ function resetDrawing() {
   Object.assign(colors(), defaultInk());
   save();
   $('color-target').value = 'all';
-  syncControls();
-  buildParameterControls();
-  updateColorControls();
-  render();
+  refresh();
   fitZoom();
 }
 
@@ -322,16 +324,16 @@ async function download(format, partOnly = false) {
     let source;
     if (partOnly) {
       target.isolated = target.selectedPart;
-      const mounted = mountGeometry(await requestGeometry(subject, target), subject, target);
+      const mounted = mountGeometry(await requestGeometry(subject, target, target.explosion), subject, target);
       styleGeometry(mounted.group, target.preset, ink);
       source = mounted.node;
     } else {
       source = svg.cloneNode(true);
     }
-    const part = target.isolated !== null ? subject.parts.find(p => String(p.id) === String(target.isolated)) : null;
+    const part = subject.parts.find(p => p.id === target.isolated);
     const filename = [
       subject.id,
-      part ? slug(part.name) : (target.explosion ? 'exploded' : 'assembled'),
+      part ? SHEET.slug(part.name) : (target.explosion ? 'exploded' : 'assembled'),
       target.preset,
       crop ? 'cropped' : null,
       transparent ? 'transparent' : null
@@ -369,10 +371,7 @@ $('view').addEventListener('keydown', event => {
 });
 $('linework').addEventListener('change', event => update({preset: event.target.value}));
 $('explosion').addEventListener('input', event => update({explosion: Number(event.target.value) / 100}, {delay: RENDER_DELAY}));
-$('reset-parameters').addEventListener('click', () => {
-  update({params: defaultParams(selected)});
-  buildParameterControls();
-});
+$('reset-parameters').addEventListener('click', () => update({params: defaultParams(selected)}));
 $('part-target').addEventListener('change', event => choosePart(event.target.value));
 $('isolate-part').addEventListener('click', () => update({isolated: state().selectedPart === 'all' ? null : state().selectedPart}));
 $('show-all').addEventListener('click', () => update({isolated: null, selectedPart: 'all'}));

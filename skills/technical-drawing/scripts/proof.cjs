@@ -1,20 +1,19 @@
 #!/usr/bin/env node
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm'), {execFileSync} = require('node:child_process');
 const {has, findChrome} = require('./commands.cjs');
+const {assets, RUNTIME, load: loadConfig} = require('./config.cjs');
 
-const assets = path.resolve(__dirname, '../assets');
 const SHEET = require(path.join(assets, 'sheet.js'));
 const SHEET_BOX = [0, 0, SHEET.width, SHEET.height];
-const HIDDEN = .5, PIXELS = 2000, MAX_SPACING = 1.5;
+const HIDDEN = .5, PIXELS = 2000;
+const VIEWS = [['assembled', 0], ['exploded', 1], ['spread', 1.5]];
 
 function load(configPath) {
-  const base = path.dirname(path.resolve(configPath)), config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+  const {config, modelScripts} = loadConfig(configPath);
   const context = {console, structuredClone};
   context.self = context;
   vm.createContext(context);
-  for (const file of [path.join(assets, 'sheet.js'), path.join(assets, 'geometry.js'), path.join(assets, 'projection.js'), ...config.modelScripts.map(f => path.resolve(base, f))]) {
-    vm.runInContext(fs.readFileSync(file, 'utf8'), context, {filename: file});
-  }
+  for (const file of [...RUNTIME, ...modelScripts]) vm.runInContext(fs.readFileSync(file, 'utf8'), context, {filename: file});
   return {config, models: context.DrawingModels ?? {}};
 }
 
@@ -37,9 +36,8 @@ function inkLengths(markup) {
 }
 
 function sheet(markup, title, viewBox = SHEET_BOX.join(' '), size = `width="${SHEET.width}mm" height="${SHEET.height}mm"`) {
-  const styles = Object.entries(SHEET.linework.technical).map(([role, w]) => `[data-line-role="${role}"]{stroke-width:${w}}`).join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" ${size} viewBox="${viewBox}"><title>${title.replaceAll('&', '&amp;').replaceAll('<', '&lt;')}</title>`
-    + `<style>path{fill:none;stroke:#202020;stroke-linecap:butt;stroke-linejoin:round}${styles}[data-line-role="axis"]{stroke-dasharray:${SHEET.axisDash}}</style>`
+    + `<style>path{fill:none;stroke:#202020;stroke-linecap:butt;stroke-linejoin:round}${SHEET.css('technical')}</style>`
     + `<rect x="-1000" y="-1000" width="3000" height="3000" fill="#fff"/>${markup}</svg>`;
 }
 
@@ -93,6 +91,56 @@ function parameterSets(d, quick, overrides = {}) {
   return sets;
 }
 
+function checkInk(d, markup, label, warnings) {
+  const ink = inkLengths(markup);
+  for (const p of d.parts) {
+    if (!ink.get(p.id)) warnings.push(`${label}: part "${p.id}" has no visible ink`);
+  }
+}
+
+function checkOcclusion(d, model, overrides, warnings) {
+  const defaults = [...parameterSets(d, true, overrides).values()][0];
+  const full = model(defaults, {explosion: 1, fitExplosion: 1, isolated: null}), fullInk = inkLengths(full.markup);
+  if (!Number.isFinite(full.scale)) {
+    warnings.push(`${d.id}: the model returns no scale, so the occlusion check is skipped`);
+    return;
+  }
+  let lowest = null;
+  for (const p of d.parts) {
+    const alone = model(defaults, {explosion: 1, fitExplosion: 1, isolated: p.id});
+    const ratio = (fullInk.get(p.id) ?? 0) / full.scale / ((inkLengths(alone.markup).get(p.id) ?? 0) / alone.scale || 1);
+    if (ratio < HIDDEN) warnings.push(`${d.id} exploded: "${p.id}" shows ${Math.round(ratio * 100)}% of its own linework, so another part hides most of it`);
+    if (!lowest || ratio < lowest.ratio) lowest = {id: p.id, ratio};
+  }
+  if (lowest) console.log(`${d.id} exploded: the most hidden part, "${lowest.id}", shows ${Math.round(lowest.ratio * 100)}% of its own linework`);
+}
+
+function contactSheet(rasterize, files, outDir, warnings) {
+  const pngs = files.map(f => f.replace(/\.svg$/, '.png')).filter(f => fs.existsSync(f)), columns = 3, w = SHEET.width, h = SHEET.height, gap = 8;
+  const rows = Math.ceil(pngs.length / columns), width = columns * w + (columns + 1) * gap, height = rows * (h + 14) + (rows + 1) * gap;
+  const tiles = pngs.map((f, i) => {
+    const x = gap + (i % columns) * (w + gap), y = gap + Math.floor(i / columns) * (h + 14 + gap);
+    return `<image href="${path.basename(f)}" x="${x}" y="${y}" width="${w}" height="${h}"/><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#ccc"/><text x="${x}" y="${y + h + 11}" font-family="sans-serif" font-size="10">${path.basename(f, '.png')}</text>`;
+  }).join('');
+  const sheetFile = path.resolve(outDir, 'contact.svg'), sheetHeight = Math.round(PIXELS * height / width);
+  fs.writeFileSync(sheetFile, `<svg xmlns="http://www.w3.org/2000/svg" width="${PIXELS}" height="${sheetHeight}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#fff"/>${tiles}</svg>`);
+  try {
+    rasterize(sheetFile, path.resolve(outDir, 'contact.png'), sheetHeight);
+  } catch (e) {
+    warnings.push(`Could not rasterize the contact sheet: ${e.message}`);
+  }
+}
+
+function writeSheet(rasterize, markup, title, file, warnings) {
+  fs.writeFileSync(file, sheet(markup, title));
+  if (!rasterize) return;
+  try {
+    writePng(rasterize, markup, title, file.replace(/\.svg$/, '.png'));
+  } catch (e) {
+    warnings.push(`Could not rasterize ${path.basename(file)}: ${e.message}`);
+  }
+}
+
 function proof(configPath, outDir, {png = true, quick = false, crop = null, only = null, view: viewFilter = null, overrides = {}} = {}) {
   const {config, models} = load(configPath);
   fs.mkdirSync(outDir, {recursive: true});
@@ -100,13 +148,12 @@ function proof(configPath, outDir, {png = true, quick = false, crop = null, only
   const drawings = config.drawings.filter(d => !only || d.id === only);
   if (!drawings.length) throw Error(`No drawing with id ${only}`);
   if (crop && !rasterize) throw Error('Crops need an SVG rasterizer');
+  const brief = quick || Boolean(crop);
+  const views = VIEWS.slice(0, brief ? 2 : 3).filter(([name]) => !viewFilter || name === viewFilter);
+  if (!views.length) throw Error('View must be assembled, exploded or spread');
   for (const d of drawings) {
     const model = models[d.id];
     if (!model) throw Error(`No model registered for ${d.id}`);
-    const brief = quick || crop;
-    const views = (brief ? [['assembled', 0], ['exploded', 1]] : [['assembled', 0], ['exploded', 1], ['spread', MAX_SPACING]])
-      .filter(([name]) => !viewFilter || name === viewFilter);
-    if (!views.length) throw Error('View must be assembled, exploded or spread');
     for (const [label, values] of parameterSets(d, brief, overrides)) {
       for (const [view, explosion] of views) {
         const {markup} = model(values, {explosion, fitExplosion: explosion, isolated: null});
@@ -115,56 +162,17 @@ function proof(configPath, outDir, {png = true, quick = false, crop = null, only
           const file = path.resolve(outDir, `${name}-crop-${crop.join('-')}.png`);
           writePng(rasterize, markup, title, file, crop);
           files.push(file);
-          continue;
-        }
-        const file = path.resolve(outDir, name + '.svg');
-        fs.writeFileSync(file, sheet(markup, title));
-        files.push(file);
-        if (rasterize) {
-          try {
-            writePng(rasterize, markup, title, file.replace(/\.svg$/, '.png'));
-          } catch (e) {
-            warnings.push(`Could not rasterize ${path.basename(file)}: ${e.message}`);
-          }
-        }
-        if (!explosion) continue;
-        const ink = inkLengths(markup);
-        for (const p of d.parts) {
-          if (!ink.get(String(p.id))) warnings.push(`${d.id} ${label} parameters, ${view}: part "${p.id}" has no visible ink`);
+        } else {
+          const file = path.resolve(outDir, name + '.svg');
+          writeSheet(rasterize, markup, title, file, warnings);
+          files.push(file);
+          if (explosion) checkInk(d, markup, `${d.id} ${label} parameters, ${view}`, warnings);
         }
       }
     }
-    if (brief) continue;
-    const defaults = [...parameterSets(d, true, overrides).values()][0];
-    const full = model(defaults, {explosion: 1, fitExplosion: 1, isolated: null}), fullInk = inkLengths(full.markup);
-    if (!Number.isFinite(full.scale)) {
-      warnings.push(`${d.id}: the model returns no scale, so the occlusion check is skipped`);
-      continue;
-    }
-    let lowest = null;
-    for (const p of d.parts) {
-      const alone = model(defaults, {explosion: 1, fitExplosion: 1, isolated: p.id});
-      const ratio = (fullInk.get(String(p.id)) ?? 0) / full.scale / ((inkLengths(alone.markup).get(String(p.id)) ?? 0) / alone.scale || 1);
-      if (ratio < HIDDEN) warnings.push(`${d.id} exploded: "${p.id}" shows ${Math.round(ratio * 100)}% of its own linework, so another part hides most of it`);
-      if (!lowest || ratio < lowest.ratio) lowest = {id: p.id, ratio};
-    }
-    if (lowest) console.log(`${d.id} exploded: the most hidden part, "${lowest.id}", shows ${Math.round(lowest.ratio * 100)}% of its own linework`);
+    if (!brief) checkOcclusion(d, model, overrides, warnings);
   }
-  if (rasterize && !crop && files.length > 2) {
-    const pngs = files.map(f => f.replace(/\.svg$/, '.png')).filter(f => fs.existsSync(f)), columns = 3, w = SHEET.width, h = SHEET.height, gap = 8;
-    const rows = Math.ceil(pngs.length / columns), width = columns * w + (columns + 1) * gap, height = rows * (h + 14) + (rows + 1) * gap;
-    const tiles = pngs.map((f, i) => {
-      const x = gap + (i % columns) * (w + gap), y = gap + Math.floor(i / columns) * (h + 14 + gap);
-      return `<image href="${path.basename(f)}" x="${x}" y="${y}" width="${w}" height="${h}"/><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#ccc"/><text x="${x}" y="${y + h + 11}" font-family="sans-serif" font-size="10">${path.basename(f, '.png')}</text>`;
-    }).join('');
-    const sheetFile = path.resolve(outDir, 'contact.svg'), sheetHeight = Math.round(PIXELS * height / width);
-    fs.writeFileSync(sheetFile, `<svg xmlns="http://www.w3.org/2000/svg" width="${PIXELS}" height="${sheetHeight}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#fff"/>${tiles}</svg>`);
-    try {
-      rasterize(sheetFile, path.resolve(outDir, 'contact.png'), sheetHeight);
-    } catch (e) {
-      warnings.push(`Could not rasterize the contact sheet: ${e.message}`);
-    }
-  }
+  if (rasterize && !crop && files.length > 2) contactSheet(rasterize, files, outDir, warnings);
   if (png && !rasterize) warnings.push('No SVG rasterizer found. Install librsvg for rsvg-convert, or Chrome, then rerun');
   for (const w of warnings) console.warn('WARNING ' + w);
   console.log(`Wrote ${files.length} ${crop ? 'crops' : 'sheets'}${rasterize && !crop ? ` with PNG previews from ${rasterize.label}` : ''} to ${path.resolve(outDir)}`);

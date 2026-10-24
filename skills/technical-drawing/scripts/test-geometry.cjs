@@ -44,8 +44,11 @@ test('Rounded housing profiles preserve width, height and corner radii', () => {
   const points = G.roundedRectangle(80, 50, 5);
   assert.equal(Math.min(...points.map(p => p[0])), -40);
   assert.equal(Math.max(...points.map(p => p[0])), 40);
-  assert.equal(Math.min(...points.map(p => p[1])), 0);
-  assert.equal(Math.max(...points.map(p => p[1])), 50);
+  assert.equal(Math.min(...points.map(p => p[1])), -25);
+  assert.equal(Math.max(...points.map(p => p[1])), 25);
+  const moved = G.roundedRectangle(80, 50, 5, {center: [10, -5]});
+  assert.equal(Math.min(...moved.map(p => p[0])), -30);
+  assert.equal(Math.max(...moved.map(p => p[1])), 20);
   assert.throws(() => G.roundedRectangle(10, 10, 6));
 });
 test('Hollow lathes preserve their bore and closed surface connectivity', () => {
@@ -428,7 +431,7 @@ test('Extrusions cut real holes that stay open through the part', () => {
   for (let k = 0; k < 40; k++) {
     const w = 20 + random() * 60, h = 10 + random() * 30, r = (Math.min(w, h) / 2) * random(), count = 8 + Math.floor(random() * 40);
     const holes = [0, 1]
-      .map(() => disc((random() - .5) * (w - 12), h / 2 + (random() - .5) * (h - 12), 1 + random() * 2, count))
+      .map(() => disc((random() - .5) * (w - 12), (random() - .5) * (h - 12), 1 + random() * 2, count))
       .filter((c, i, all) => i === 0 || Math.hypot(c[0][0] - all[0][0][0], c[0][1] - all[0][0][1]) > 8);
     const plate = G.part('plate', 'Plate');
     G.extrude(plate, G.roundedRectangle(w, h, r), {depth: 1, holes});
@@ -456,5 +459,19 @@ test('Sweeps keep their section through right-angle turns', () => {
     const ring = frame.vertices.slice(r * 4, r * 4 + 4);
     for (let k = 0; k < 4; k++) assert.ok(Math.abs(Math.hypot(...G.sub(ring[k], ring[(k + 1) % 4])) - 2) < 1e-9, 'Every ring keeps the section side');
   }
+});
+test('Feature lines own their endpoints and part IDs are strings', () => {
+  const p = G.part(7, 'Plate');
+  assert.equal(p.id, '7');
+  assert.throws(() => G.part(undefined, 'Unnamed'), /stable ID/);
+  G.extrude(p, [[0, 0], [4, 0], [4, 4], [0, 4]], {depth: 1});
+  const before = JSON.stringify(p.lines);
+  p.vertices[0][0] = 99;
+  assert.equal(JSON.stringify(p.lines), before, 'Editing a vertex must not move feature lines');
+  const nut = G.part('nut', 'Nut');
+  G.ring(nut, 2, 5, {role: 'detail', hex: true});
+  assert.ok(nut.lines.every(l => l.role === 'detail'));
+  const radii = nut.lines.map(l => Math.hypot(l.a[1], l.a[2]));
+  assert.ok(Math.abs(Math.max(...radii) - 5) < 1e-9 && Math.abs(Math.min(...radii) - 5 * Math.cos(Math.PI / 6)) < 1e-9, 'A hex ring has flats');
 });
 console.log(JSON.stringify({passed: checks.length, checks}, null, 2));

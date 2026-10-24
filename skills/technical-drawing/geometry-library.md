@@ -11,14 +11,14 @@ The helpers run in Node through `require()` and in a browser or worker through `
 | Helper | Inputs and result |
 | --- | --- |
 | `lathe(part, profile, options)` | Revolves a closed `[x, radius]` profile around X, or around world `axis` through point `at`. Inner segments form bores, a third value of `'h'` makes a point hexagonal and a crossing profile throws |
-| `ring(part, x, radius, role, kind)` | Adds a circular feature line perpendicular to X, or a hexagonal one with `kind` set to `'h'` |
+| `ring(part, x, radius, options)` | Adds a circular feature line perpendicular to X, or a hexagonal one matching a lathe's `'h'` points with `hex: true` |
 | `helix(part, options)` | Adds a thread line from `x0` to `x1` with `radius` and `pitch`, plus optional `hand` of 1 or -1 and starting `phase` |
 | `spring(part, options)` | Builds closed wire around X from `radius`, `wire`, `turns`, `x0` and `x1`, starting at local +Y so whole turns end at the same angle |
 | `knurl(part, options)` | Adds crossing helices using `starts`, `pitch`, `radius`, `x0` and `x1` |
 | `screw(part, options)` | Builds a head, shank, thread lines and slot along X from `length`, `radius`, `headRadius`, `headHeight` and `pitch`, defaulting to 10, 1.5, 3, 2 and 0.8 |
 | `circle(part, center, radius, normal, options)` | Adds a closed circular feature line in the plane facing `normal`, with 144 `segments` to match a default lathe |
 | `ringPoints(center, radius, u, v, options)` | Samples an arc from `start` to `end` radians in orthonormal plane axes, to a `tolerance` of 0.008 model units. A full circle repeats its first point at the end |
-| `roundedRectangle(width, height, radius, options)` | Returns a rounded profile centered on X, with its bottom at Y zero |
+| `roundedRectangle(width, height, radius, options)` | Returns a rounded profile centered on the origin or on an `[x, y]` `center` |
 | `ringAngles(width, height, radius, options)` | Returns polar angles that crowd a rounded rectangle's corners, with `corner` and `side` sample counts defaulting to 12 and 24 per quarter |
 | `roundedRing(width, height, radius, options)` | Samples a rounded rectangle at given `angles` and height `z`, so rings of any size share one point count |
 | `loft(part, rings, options)` | Joins rings of equal point count into one surface; caps both ends by default, joins the last ring back to the first with `cyclic: true` and winds closed results outward |
@@ -52,7 +52,7 @@ Surface thread and knurl lines describe appearance, not cut thread solids. The s
 
 A lathe cannot blend a round section into a hexagonal one. Build that chamfer as a `loft` whose ring radius is the smaller of the hexagon and the cone at each angle.
 
-Line roles are `outline`, `edge`, `detail`, `texture` and `axis`. `line(part, a, b, role)` and most helpers default to `edge` and take a `role` option. `helix` defaults to `detail`, `ring` takes the role as its fourth argument and `knurl`, `spring` and `screw` set their own roles.
+Line roles are `outline`, `edge`, `detail`, `texture` and `axis`. `line(part, a, b, role)` and most helpers default to `edge` and take a `role` option. `helix` defaults to `detail`, while `knurl`, `spring` and `screw` set their own roles.
 
 ## Build prismatic parts without custom triangulation
 
@@ -64,7 +64,7 @@ Pass `holes` for pivot holes, mounting holes and windows. Each hole is its own o
 
 ```js
 const disc = (cx, r) => Array.from({length: 48}, (_, i) => [cx + r * Math.cos(i * Math.PI / 24), r * Math.sin(i * Math.PI / 24)]);
-G.extrude(lever, G.roundedRectangle(80, 16, 8, {y: -8}), {depth: 3, holes: [disc(-30, 4), disc(30, 3)]});
+G.extrude(lever, G.roundedRectangle(80, 16, 8), {depth: 3, holes: [disc(-30, 4), disc(30, 3)]});
 ```
 
 ## Place each part once

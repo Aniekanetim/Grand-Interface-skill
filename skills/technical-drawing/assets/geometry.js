@@ -38,16 +38,16 @@
   };
 
   function part(id, name, explosion = [0, 0, 0]) {
-    if (!name || !String(id)) throw Error('A part needs a stable ID and name');
+    if (!name || id === undefined || id === null || String(id) === '') throw Error('A part needs a stable ID and name');
     point3(explosion, 'An explosion');
-    return {id, name, explosion, vertices: [], triangles: [], lines: []};
+    return {id: String(id), name, explosion, vertices: [], triangles: [], lines: []};
   }
 
   function line(p, a, b, role = 'edge') {
     point3(a, 'A line end');
     point3(b, 'A line end');
     lineRole(role);
-    if (Math.hypot(...sub(a, b)) > 1e-9) p.lines.push({a, b, role});
+    if (Math.hypot(...sub(a, b)) > 1e-9) p.lines.push({a: [...a], b: [...b], role});
   }
 
   function ringPoints(center, radius, u, v, {start = 0, end = TAU, tolerance = .008} = {}) {
@@ -66,40 +66,34 @@
     });
   }
 
-  function radialPoint(x, r, kind, t) {
+  function radialPoint(x, r, hex, t) {
     let radius = r;
-    if (kind === 'h') {
+    if (hex) {
       const local = ((t + Math.PI / 6) % (Math.PI / 3) + Math.PI / 3) % (Math.PI / 3) - Math.PI / 6;
       radius = r * Math.cos(Math.PI / 6) / Math.cos(local);
     }
     return [x, radius * Math.cos(t), radius * Math.sin(t)];
   }
 
-  function ring(p, x, r, role = 'edge', kind = 'c') {
+  function ring(p, x, r, {role = 'edge', hex = false} = {}) {
     positive(r);
     for (let j = 0; j < RING_SEGMENTS; j++) {
-      line(p, radialPoint(x, r, kind, TAU * j / RING_SEGMENTS), radialPoint(x, r, kind, TAU * (j + 1) / RING_SEGMENTS), role);
+      line(p, radialPoint(x, r, hex, TAU * j / RING_SEGMENTS), radialPoint(x, r, hex, TAU * (j + 1) / RING_SEGMENTS), role);
     }
     return p;
   }
 
   function lathe(p, profile, {axis = 'x', at, ...options} = {}) {
-    if (axis === 'x' && at === undefined) return latheX(p, profile, options);
     return merge(p, transform(latheX(piece(), profile, options), {origin: at ?? [0, 0, 0], ...along(axis)}));
   }
 
   function latheX(p, profile, {segments = RING_SEGMENTS, start = 0, end = TAU, omitRings = [], creaseAngle, role = 'edge'} = {}) {
     count(segments, 12, 720);
     lineRole(role);
-    if (profile.some(point => point[2] === 'h') && segments % 12 !== 0) throw Error('Hex profiles need a segment count divisible by 12');
-    if (profile.length < 3) throw Error('A lathe needs a closed radial profile');
-    for (const [x, r] of profile) {
-      finite(x);
-      finite(r);
-      if (r < 0) throw Error('Negative radius');
-    }
-    if (!(end > start && end - start <= TAU + 1e-8)) throw Error('Invalid lathe arc');
     cleanProfile(profile.map(([x, r]) => [x, r]));
+    if (profile.some(([, r]) => r < 0)) throw Error('Negative radius');
+    if (profile.some(point => point[2] === 'h') && segments % 12 !== 0) throw Error('Hex profiles need a segment count divisible by 12');
+    if (!(end > start && end - start <= TAU + 1e-8)) throw Error('Invalid lathe arc');
     const crease = i => {
       if (creaseAngle === undefined) return true;
       const [a, b, c] = [-1, 0, 1].map(k => profile[(i + k + profile.length) % profile.length]);
@@ -115,7 +109,7 @@
     const idx = (i, j) => offset + i * cols + j;
 
     for (const [x, r, kind] of profile) {
-      for (let j = 0; j < cols; j++) p.vertices.push(radialPoint(x, r, kind, start + (end - start) * j / n));
+      for (let j = 0; j < cols; j++) p.vertices.push(radialPoint(x, r, kind === 'h', start + (end - start) * j / n));
     }
     for (let i = 0; i < profile.length; i++) {
       const k = (i + 1) % profile.length;
@@ -213,20 +207,17 @@
     return p;
   }
 
-  function roundedRectangle(width, height, radius, {x = 0, y = 0, tolerance = .01} = {}) {
+  function roundedRectangle(width, height, radius, {center = [0, 0], tolerance = .01} = {}) {
     positive(width);
     positive(height);
     positive(radius);
     positive(tolerance);
+    center.forEach(finite);
     if (radius > Math.min(width, height) / 2) throw Error('Corner radius exceeds profile');
-    const corners = [
-      [width / 2 - radius, radius, -Math.PI / 2],
-      [width / 2 - radius, height - radius, 0],
-      [-width / 2 + radius, height - radius, Math.PI / 2],
-      [-width / 2 + radius, radius, Math.PI]
-    ];
+    const x = width / 2 - radius, y = height / 2 - radius;
+    const corners = [[x, -y, -Math.PI / 2], [x, y, 0], [-x, y, Math.PI / 2], [-x, -y, Math.PI]];
     return corners.flatMap(([cx, cy, start]) =>
-      ringPoints([cx, cy, 0], radius, [1, 0, 0], [0, 1, 0], {start, end: start + Math.PI / 2, tolerance}).map(p => [p[0] + x, p[1] + y]));
+      ringPoints([cx, cy, 0], radius, [1, 0, 0], [0, 1, 0], {start, end: start + Math.PI / 2, tolerance}).map(p => [p[0] + center[0], p[1] + center[1]]));
   }
 
   function transform(p, {origin = [0, 0, 0], xAxis = [1, 0, 0], yAxis = [0, 1, 0], zAxis = [0, 0, 1]} = {}) {
@@ -251,6 +242,13 @@
     return target;
   }
 
+  const turn = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  const crosses = (a, b, c, d) => turn(a, b, c) * turn(a, b, d) < 0 && turn(c, d, a) * turn(c, d, b) < 0;
+  const inside = ([x, y], loop) => loop.reduce((hit, a, i) => {
+    const b = loop[(i + 1) % loop.length];
+    return (a[1] > y) !== (b[1] > y) && x < a[0] + (y - a[1]) * (b[0] - a[0]) / (b[1] - a[1]) ? !hit : hit;
+  }, false);
+
   function cleanProfile(profile) {
     if (!Array.isArray(profile) || profile.length < 3 || profile.length > 1024) throw Error('A profile needs 3–1024 points');
     for (const v of profile) {
@@ -260,7 +258,6 @@
     const span = Math.max(...[0, 1].map(k => Math.max(...profile.map(p => p[k])) - Math.min(...profile.map(p => p[k]))));
     const epsilon = Math.max(span * 1e-10, 1e-12), areaTolerance = epsilon * span;
     const same = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) <= epsilon;
-    const turn = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
     const onSegment = (a, b, c) => Math.abs(turn(a, b, c)) <= areaTolerance
       && c[0] >= Math.min(a[0], b[0]) - epsilon && c[0] <= Math.max(a[0], b[0]) + epsilon
       && c[1] >= Math.min(a[1], b[1]) - epsilon && c[1] <= Math.max(a[1], b[1]) + epsilon;
@@ -276,8 +273,7 @@
       for (let j = i + 1; j < points.length; j++) {
         if (j === i + 1 || (i === 0 && j === points.length - 1)) continue;
         const a = points[i], b = points[(i + 1) % points.length], c = points[j], d = points[(j + 1) % points.length];
-        const crossing = turn(a, b, c) * turn(a, b, d) < 0 && turn(c, d, a) * turn(c, d, b) < 0;
-        if (crossing || onSegment(a, b, c) || onSegment(a, b, d) || onSegment(c, d, a) || onSegment(c, d, b)) {
+        if (crosses(a, b, c, d) || onSegment(a, b, c) || onSegment(a, b, d) || onSegment(c, d, a) || onSegment(c, d, b)) {
           throw Error('Profile must not intersect itself');
         }
       }
@@ -288,10 +284,10 @@
     }, 0) / 2;
     if (points.length < 3 || Math.abs(area) <= areaTolerance) throw Error('Profile has no area');
     if (area < 0) points.reverse();
-    return {points, turn, areaTolerance};
+    return {points, areaTolerance};
   }
 
-  function triangulate(points, order, turn, areaTolerance) {
+  function triangulate(points, order, areaTolerance) {
     const remaining = [...order], triangles = [];
     const same = (u, v) => points[u][0] === points[v][0] && points[u][1] === points[v][1];
     const inside = (a, b, c, v) => turn(points[a], points[b], points[v]) >= -areaTolerance
@@ -312,23 +308,20 @@
     return triangles;
   }
 
-  function bridgeHoles(points, outer, holes, turn) {
-    const crosses = (a, b, c, d) => turn(a, b, c) * turn(a, b, d) < 0 && turn(c, d, a) * turn(c, d, b) < 0;
+  function bridgeHoles(points, outer, holes) {
     const edges = loop => loop.map((v, i) => [v, loop[(i + 1) % loop.length]]);
+    const coordinates = loop => loop.map(v => points[v]);
     let merged = [...outer];
     const pending = [...holes].sort((h, k) => Math.max(...k.map(v => points[v][0])) - Math.max(...h.map(v => points[v][0])));
     while (pending.length) {
       const hole = pending.shift(), start = hole.reduce((m, v, i) => points[v][0] > points[hole[m]][0] ? i : m, 0), m = hole[start];
       const blockers = [...edges(merged), ...pending.flatMap(edges), ...edges(hole)];
       const others = [...merged, ...pending.flat(), ...hole];
-      const inside = ([x, y], loop) => loop.reduce((hit, v, i) => {
-        const [ax, ay] = points[v], [bx, by] = points[loop[(i + 1) % loop.length]];
-        return (ay > y) !== (by > y) && x < ax + (y - ay) * (bx - ax) / (by - ay) ? !hit : hit;
-      }, false);
+      const enclosing = [hole, ...pending].map(coordinates);
       const clear = v => {
         const [ax, ay] = points[m], [bx, by] = points[v], length = Math.hypot(bx - ax, by - ay);
         const step = [ax + (bx - ax) * 1e-4, ay + (by - ay) * 1e-4];
-        if (inside(step, hole) || pending.some(h => inside(step, h))) return false;
+        if (enclosing.some(loop => inside(step, loop))) return false;
         if (blockers.some(([e0, e1]) => e0 !== v && e1 !== v && e0 !== m && e1 !== m && crosses(points[m], points[v], points[e0], points[e1]))) return false;
         return !others.some(w => {
           if (w === v || w === m || (points[w][0] === bx && points[w][1] === by)) return false;
@@ -353,14 +346,10 @@
     finite(creaseAngle);
     if (creaseAngle < 0 || creaseAngle > 180) throw Error('Invalid crease angle');
     if (!Array.isArray(holes)) throw Error('Holes must be an array of profiles');
-    const {points: outer, turn, areaTolerance} = cleanProfile(profile);
-    const contains = ([x, y]) => outer.reduce((inside, a, i) => {
-      const b = outer[(i + 1) % outer.length];
-      return (a[1] > y) !== (b[1] > y) && x < a[0] + (y - a[1]) * (b[0] - a[0]) / (b[1] - a[1]) ? !inside : inside;
-    }, false);
+    const {points: outer, areaTolerance} = cleanProfile(profile);
     const loops = [outer, ...holes.map(h => {
       const points = cleanProfile(h).points.reverse();
-      if (!points.every(contains)) throw Error('Holes must sit inside the profile');
+      if (!points.every(point => inside(point, outer))) throw Error('Holes must sit inside the profile');
       return points;
     })];
     const points = loops.flat(), indexLoops = [];
@@ -368,8 +357,8 @@
       indexLoops.push(loop.map((_, i) => offset + i));
       return offset + loop.length;
     }, 0);
-    const order = indexLoops.length > 1 ? bridgeHoles(points, indexLoops[0], indexLoops.slice(1), turn) : indexLoops[0];
-    const caps = triangulate(points, order, turn, areaTolerance);
+    const order = indexLoops.length > 1 ? bridgeHoles(points, indexLoops[0], indexLoops.slice(1)) : indexLoops[0];
+    const caps = triangulate(points, order, areaTolerance);
 
     const base = p.vertices.length, n = points.length;
     for (const z of [0, depth]) p.vertices.push(...points.map(([x, y]) => [x, y, z]));
@@ -411,7 +400,7 @@
     [x0, y0, z0, x1, y1, z1].forEach(finite);
     if (!(x1 > x0 && y1 > y0 && z1 > z0)) throw Error('A box needs its second corner above the first on every axis');
     const profile = radius > 0
-      ? roundedRectangle(x1 - x0, y1 - y0, radius, {x: (x0 + x1) / 2, y: y0})
+      ? roundedRectangle(x1 - x0, y1 - y0, radius, {center: [(x0 + x1) / 2, (y0 + y1) / 2]})
       : [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
     return merge(p, transform(extrude(piece(), profile, {depth: z1 - z0, role}), {origin: [0, 0, z0]}));
   }
@@ -439,19 +428,15 @@
     [width, height].forEach(positive);
     [radius, z, ...center].forEach(finite);
     if (radius < 0 || radius > Math.min(width, height) / 2) throw Error('Corner radius exceeds profile');
-    const inside = (c, s, d) => {
-      const qx = Math.abs(c * d) - (width / 2 - radius), qy = Math.abs(s * d) - (height / 2 - radius);
-      return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - radius <= 0;
-    };
+    const qx = width / 2 - radius, qy = height / 2 - radius;
     return angles.map(t => {
-      const c = Math.cos(t), s = Math.sin(t);
-      let lo = 0, hi = Math.hypot(width, height);
-      for (let k = 0; k < 52; k++) {
-        const mid = (lo + hi) / 2;
-        if (inside(c, s, mid)) lo = mid;
-        else hi = mid;
+      const c = Math.abs(Math.cos(t)), s = Math.abs(Math.sin(t));
+      let d = Math.min(width / 2 / c, height / 2 / s);
+      if (c * d > qx && s * d > qy) {
+        const b = c * qx + s * qy;
+        d = b + Math.sqrt(Math.max(0, b * b - qx * qx - qy * qy + radius * radius));
       }
-      return [center[0] + lo * c, center[1] + lo * s, z];
+      return [center[0] + d * Math.cos(t), center[1] + d * Math.sin(t), z];
     });
   }
 
@@ -476,7 +461,11 @@
     const tangents = path.map((_, i) => unit(sub(at(i + 1), at(i - 1))));
     const transport = (u, from, to) => {
       const axis = cross(from, to), s2 = dot(axis, axis), c = dot(from, to);
-      const turned = s2 < 1e-18 ? u : u.map((k, i) => k * c + cross(axis, u)[i] + axis[i] * dot(axis, u) * (1 - c) / s2);
+      let turned = u;
+      if (s2 >= 1e-18) {
+        const w = cross(axis, u), d = dot(axis, u);
+        turned = u.map((k, i) => k * c + w[i] + axis[i] * d * (1 - c) / s2);
+      }
       return unit(sub(turned, to.map(k => k * dot(turned, to))));
     };
     const frames = [unit(cross(tangents[0], Math.abs(tangents[0][2]) < .9 ? [0, 0, 1] : [1, 0, 0]))];

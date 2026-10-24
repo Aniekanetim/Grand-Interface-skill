@@ -62,7 +62,7 @@ Wind every triangle of a part the same way, toward the outside where you can. On
 
 For a thin solid that needs real walls, orient each triangle against a reference point inside the material. That stays correct where a global centroid test fails.
 
-`transform` accepts rigid frames only. For a tilt or shear, map vertices and line endpoints to new arrays with one function, as `transform` does. Lines from `extrude` and from a `lathe` without `axis` or `at` share their vertex arrays, so mutating a vertex in place moves those lines too.
+`transform` accepts rigid frames only. For a tilt or shear, map vertices and line endpoints to new arrays with one function, as `transform` does.
 
 Faces closer than about 0.5 mm on paper ink as a solid black shape. Thicken a thin part such as a watch hand, or draw it as one outline with no thickness.
 
