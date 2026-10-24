@@ -13,16 +13,16 @@ Provide these controls:
 | Control | Behavior |
 | --- | --- |
 | Zoom out and Zoom in | Change viewing magnification without changing the drawing |
-| Fit | Restore the whole-sheet view and recalculate it when the viewport changes |
+| Reset | Restore the drawing's view, settings, colors and fitted zoom. Zero also fits the sheet, and the fit recalculates when the viewport changes |
 | Appearance | Toggle light and dark mode, with a System option in settings |
-| Color | Open line-color presets, a custom picker and a reset action |
+| Color | Open a line-hue slider for the whole drawing or one part, and a reset action |
 | Drawing settings | Choose linework, assembly spacing and model parameters |
 | Parts | Select, isolate, color or export a complete component |
 | Download SVG | Save the editable vector source |
 | Download PNG | Save the full sheet at the stated pixel dimensions |
 | Download PDF | Save the full vector sheet at its physical page size |
 
-Show the zoom percentage and bound its range. A useful starting range is 25–400% of fitted size.
+Show the zoom percentage and bound its range. A useful starting range is 25–400% of fitted size. On narrow screens keep the percentage for screen readers only, show the view switch as icons and drop the Color trigger, since Parts still opens the color panel.
 
 Keep enlarged artwork in a scrollable viewport so every edge remains reachable with a keyboard or touch. Reserve space for controls, including their wrapped height on narrow screens.
 
@@ -55,7 +55,7 @@ Use one resolved theme attribute for page surfaces, panels, fields and native co
 
 Adapt neutral occluding faces with the paper. Lighten preview ink in dark mode without changing its source color or the geometry that hides rear edges.
 
-Keep appearance separate from drawing state. Exports retain the chosen ink colors on white or transparent paper, and the color panel explains this distinction in dark mode.
+Keep appearance separate from drawing state. Exports retain the chosen ink colors on white or transparent paper.
 
 Inspect the drawing, secondary text, fields and focus indicators in both appearances.
 
@@ -139,13 +139,13 @@ Size the displayed sheet inside a scrollable stage. Layout dimensions must grow 
 
 A CSS transform alone does not reserve the enlarged sheet's layout space. Resize a containing stage too, or change the image's rendered width and height directly.
 
-`Fit` is a viewing convenience, not a claim that the drawing appears at its printed scale. Preserve physical dimensions in the SVG and PDF files.
+Fitting the sheet to the viewport is a viewing convenience, not a claim that the drawing appears at its printed scale. Preserve physical dimensions in the SVG and PDF files.
 
 ## Test the controls and the downloaded bytes
 
 For every build, run `node tools/technical-drawing/scripts/check-viewer.cjs dist/index.html check/` from the project folder, with Node 22 or later. It opens the page from disk in headless Chrome, waits for each drawing, screenshots it and fails on errors, missing parts or network requests. Add `--dark` to check the dark appearance.
 
-Before delivery, also open the generated page from disk and exercise zoom, Fit, presets, spacing, parameters, part selection, isolation, colors and every download. Test wide and narrow viewports, including keyboard access and panel dismissal.
+Before delivery, also open the generated page from disk and exercise zoom, reset, presets, spacing, parameters, part selection, isolation, colors and every download. Test wide and narrow viewports, including keyboard access and panel dismissal.
 
 Test system appearance, explicit overrides, reload persistence and return to System. Check both themes at narrow widths, then export from dark mode to confirm the original ink and paper survive.
 

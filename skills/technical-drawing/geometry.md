@@ -60,11 +60,13 @@ Share vertex indices along every seam. Unshared seams hide the silhouette test, 
 
 Wind every triangle of a part the same way, toward the outside where you can. One reversed patch swaps silhouette and interior edges, which shows as a heavy front arc beside a light rear arc.
 
-For a thin blade or sheet, orient each triangle against a reference point inside the material. That stays correct where a global centroid test fails.
+For a thin solid that needs real walls, orient each triangle against a reference point inside the material. That stays correct where a global centroid test fails.
 
 `transform` accepts rigid frames only. For a tilt or shear, map vertices and line endpoints to new arrays with one function, as `transform` does. Lines from `extrude` and from a `lathe` without `axis` or `at` share their vertex arrays, so mutating a vertex in place moves those lines too.
 
 Faces closer than about 0.5 mm on paper ink as a solid black shape. Thicken a thin part such as a watch hand, or draw it as one outline with no thickness.
+
+A part a little thicker than that, such as a fan blade, fin or sheet tab, still draws its edges twice. The visible edge jumps between the two faces and leaves steps and stubs that show when zoomed. Build it as one open sheet of triangles with no side walls, since its free edges outline themselves.
 
 Keep hidden internals clear of the surface that covers them by more than its facet error. A post that grazes a coarse patch pokes through as stray arcs.
 
@@ -78,7 +80,7 @@ When both poses matter, such as folded and deployed prongs, the parameter's mini
 
 Sample circles in their own plane with `ringPoints`. An axis-aligned SVG ellipse cannot follow a circle on a sloping face.
 
-Subdivide curves until the projected chord error is below 0.05 mm on paper. Coarse polygons become visibly faceted in close-ups.
+Subdivide curves until the projected chord error is below 0.05 mm on paper. The viewer zooms to 400%, so judge facets in a close-up crop rather than at sheet size. A freeform sheet such as a blade needs about 40 samples along each long curved edge.
 
 Draw only silhouettes, real boundaries and necessary feature lines. Triangulation diagonals, duplicate coincident edges and tessellation rings on smooth surfaces are not ink.
 

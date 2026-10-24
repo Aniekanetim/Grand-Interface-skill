@@ -30,7 +30,7 @@ Create a JSON configuration beside the model scripts. Paths resolve relative to 
 
 Use an empty `parameters` array when the object has no suitable editable dimensions. IDs stay stable, and drawing IDs use lowercase slugs.
 
-Two optional fields shape the settings and exports. `parameterNote` replaces the line under the parameter sliders. `concept` defaults to `true` and marks exports as illustrative, so set it to `false` only for a drawing built from authoritative dimensions.
+One optional field shapes the exports. `concept` defaults to `true` and marks exports as illustrative, so set it to `false` only for a drawing built from authoritative dimensions.
 
 The drawing selector appears only when the configuration holds more than one drawing.
 

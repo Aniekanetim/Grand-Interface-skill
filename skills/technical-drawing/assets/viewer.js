@@ -3,7 +3,7 @@ const $ = id => document.getElementById(id), ns = 'http://www.w3.org/2000/svg';
 const SHEET = {width: 420, height: 297};
 const RENDER_DELAY = 120;
 const viewport = $('viewport'), stage = $('stage'), drawing = $('drawing'), selection = $('selection'), selectionBox = $('selection-box');
-const palette = [['Graphite', '#202020'], ['Blue', '#3568b0'], ['Green', '#397362'], ['Terracotta', '#b25940'], ['Ochre', '#99752b'], ['Violet', '#805699']];
+const GRAPHITE = '#202020', DEFAULT_HUE = 250, HUE_INK = {lightness: .52, chroma: .11};
 const presets = {
   technical: {outline: .35, edge: .22, detail: .13, texture: .09, axis: .13},
   patent: {outline: .24, edge: .15, detail: .10, texture: .065, axis: .1},
@@ -11,21 +11,37 @@ const presets = {
 };
 const AXIS_DASH = '6 1 1 1';
 const geometryKeys = ['params', 'explosion', 'isolated'];
-const storageKey = 'technical-drawing-colors-v2';
+const storageKey = 'technical-drawing-colors-v3';
 
-const defaultInk = () => ({base: palette[0][1], parts: {}});
+const defaultInk = () => ({base: null, parts: {}});
 const defaultParams = d => Object.fromEntries(d.parameters.map(p => [p.key, p.default]));
 const slug = name => name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-let preferences = {};
-try { preferences = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch {}
-const states = new Map(drawings.map(d => [d.id, {
+function inkFromHue(hue) {
+  const angle = hue * Math.PI / 180, a = HUE_INK.chroma * Math.cos(angle), b = HUE_INK.chroma * Math.sin(angle);
+  const l = (HUE_INK.lightness + .3963377774 * a + .2158037573 * b) ** 3;
+  const m = (HUE_INK.lightness - .1055613458 * a - .0638541728 * b) ** 3;
+  const s = (HUE_INK.lightness - .0894841775 * a - 1.291485548 * b) ** 3;
+  const linear = [4.0767416621 * l - 3.3077115913 * m + .2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - .3413193965 * s, -.0041960863 * l - .7034186147 * m + 1.707614701 * s];
+  return '#' + linear.map(x => {
+    const v = x <= .0031308 ? 12.92 * x : 1.055 * x ** (1 / 2.4) - .055;
+    return Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0');
+  }).join('');
+}
+const inkColor = hue => hue === null ? GRAPHITE : inkFromHue(hue);
+const resolveInk = ink => ({base: inkColor(ink.base), parts: Object.fromEntries(Object.entries(ink.parts).map(([part, hue]) => [part, inkFromHue(hue)]))});
+const HUE_STOPS = Array.from({length: 13}, (_, i) => inkFromHue(i * 30)).join(', ');
+const initialState = d => ({
   params: defaultParams(d),
   explosion: (d.initialView ?? (d.parts.length === 1 ? 'assembled' : 'exploded')) === 'assembled' ? 0 : 1,
   preset: 'technical',
   selectedPart: 'all',
   isolated: null
-}]));
+});
+
+let preferences = {};
+try { preferences = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch {}
+const states = new Map(drawings.map(d => [d.id, initialState(d)]));
 let selected = drawings.find(d => d.id === location.hash.slice(1)) || drawings[0];
 let zoom = 1, svg = null, geometry = null, drawingStatus = 'rendering', exportBusy = false, messageTimer;
 
@@ -120,7 +136,7 @@ async function render(delay = 0) {
     svg = mounted.node;
     geometry = mounted.group;
     drawing.replaceChildren(svg, selection);
-    styleGeometry(geometry, state().preset, colors());
+    styleGeometry(geometry, state().preset, resolveInk(colors()));
     document.title = subject.title + ' · Technical drawing';
     setDrawingStatus('ready');
     updateSelection();
@@ -141,7 +157,7 @@ function update(patch, {delay = 0} = {}) {
 }
 
 function restyle() {
-  if (geometry) styleGeometry(geometry, state().preset, colors());
+  if (geometry) styleGeometry(geometry, state().preset, resolveInk(colors()));
   updateSelection();
   updateColorControls();
 }
@@ -165,7 +181,11 @@ function syncControls() {
   $('linework').value = s.preset;
   $('explosion').value = s.explosion * 100;
   $('explosion-value').value = Math.round(s.explosion * 100) + '%';
-  $('view').value = s.explosion === 0 ? 'assembled' : 'exploded';
+  for (const option of $('view').children) {
+    const checked = option.dataset.view === (s.explosion === 0 ? 'assembled' : 'exploded');
+    option.setAttribute('aria-checked', String(checked));
+    option.tabIndex = checked ? 0 : -1;
+  }
   $('part-target').value = s.selectedPart;
   $('isolate-part').setAttribute('aria-pressed', String(isolated));
   $('isolate-part').textContent = isolated ? 'Isolated' : 'Isolate';
@@ -184,30 +204,20 @@ function updateSelection() {
 }
 
 function updateColorControls() {
-  const target = $('color-target').value, c = colors(), ink = target === 'all' ? c.base : (c.parts[target] || c.base);
+  const target = $('color-target').value, c = colors(), hue = target === 'all' ? c.base : (c.parts[target] ?? c.base);
   const mixed = target === 'all' && Object.values(c.parts).some(value => value !== c.base);
-  $('custom-color').value = ink;
-  $('hex-color').value = mixed ? '' : ink.toUpperCase();
-  $('hex-color').placeholder = mixed ? 'Mixed colors' : palette[0][1];
-  $('hex-color').setAttribute('aria-invalid', 'false');
-  for (const button of $('swatches').children) {
-    button.setAttribute('aria-pressed', String(!mixed && button.dataset.color.toLowerCase() === ink.toLowerCase()));
-  }
-  $('color-dot').style.background = Object.keys(c.parts).length ? 'conic-gradient(' + palette.slice(1).map(p => p[1]).join(',') + ')' : c.base;
+  $('hue').value = (mixed ? null : hue) ?? DEFAULT_HUE;
+  $('color-dot').style.background = Object.keys(c.parts).length ? `conic-gradient(${HUE_STOPS})` : inkColor(c.base);
 }
 
-function setColor(value) {
-  if (!/^#[0-9a-f]{6}$/i.test(value)) {
-    $('hex-color').setAttribute('aria-invalid', 'true');
-    return;
-  }
+function setHue(hue) {
   const target = $('color-target').value;
   editColors(c => {
     if (target === 'all') {
-      c.base = value;
+      c.base = hue;
       c.parts = {};
     } else {
-      c.parts[target] = value;
+      c.parts[target] = hue;
     }
   });
 }
@@ -218,9 +228,7 @@ function choosePart(id) {
 
 function buildParameterControls() {
   $('parameters').replaceChildren();
-  for (const id of ['parameter-divider', 'reset-parameters', 'parameter-note']) $(id).hidden = !selected.parameters.length;
-  $('concept-note').hidden = selected.concept === false;
-  $('parameter-note').textContent = selected.parameterNote || 'Concept dimensions. Changes update matching parts in every view.';
+  for (const id of ['parameter-divider', 'reset-parameters']) $(id).hidden = !selected.parameters.length;
   for (const p of selected.parameters) {
     const field = document.createElement('div');
     field.className = 'field';
@@ -254,7 +262,7 @@ function selectDrawing(id) {
     control.replaceChildren(new Option('All parts', 'all'), ...selected.parts.map(p => new Option(p.name, p.id)));
   }
   const assembly = selected.parts.length > 1;
-  for (const control of ['view', 'view-label', 'spacing-field']) $(control).hidden = !assembly;
+  for (const control of ['view', 'spacing-field']) $(control).hidden = !assembly;
   syncControls();
   buildParameterControls();
   updateColorControls();
@@ -298,11 +306,23 @@ function fitZoom() {
   renderZoom(true);
 }
 
+function resetDrawing() {
+  states.set(selected.id, initialState(selected));
+  Object.assign(colors(), defaultInk());
+  save();
+  $('color-target').value = 'all';
+  syncControls();
+  buildParameterControls();
+  updateColorControls();
+  render();
+  fitZoom();
+}
+
 async function download(format, partOnly = false) {
   if (drawingStatus !== 'ready' || exportBusy) return;
   exportBusy = true;
   updateAvailability();
-  const subject = selected, target = structuredClone(state()), ink = structuredClone(colors());
+  const subject = selected, target = structuredClone(state()), ink = resolveInk(colors());
   const crop = partOnly || $('tight-crop').checked, transparent = $('transparent').checked;
   try {
     let source;
@@ -337,19 +357,21 @@ async function download(format, partOnly = false) {
   }
 }
 
-for (const [name, color] of palette) {
-  const button = document.createElement('button');
-  button.className = 'swatch';
-  button.style.setProperty('--swatch', color);
-  button.dataset.color = color;
-  button.setAttribute('aria-label', name);
-  button.setAttribute('aria-pressed', 'false');
-  button.addEventListener('click', () => setColor(color));
-  $('swatches').append(button);
-}
+$('hue').style.background = `linear-gradient(to right, ${HUE_STOPS})`;
 
 $('subject').addEventListener('change', event => selectDrawing(event.target.value));
-$('view').addEventListener('change', event => update({explosion: event.target.value === 'assembled' ? 0 : 1}));
+const setView = option => update({explosion: option.dataset.view === 'assembled' ? 0 : 1});
+$('view').addEventListener('click', event => {
+  const option = event.target.closest('[role=radio]');
+  if (option) setView(option);
+});
+$('view').addEventListener('keydown', event => {
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+  event.preventDefault();
+  const other = [...$('view').children].find(option => option.getAttribute('aria-checked') !== 'true');
+  setView(other);
+  other.focus();
+});
 $('linework').addEventListener('change', event => update({preset: event.target.value}));
 $('explosion').addEventListener('input', event => update({explosion: Number(event.target.value) / 100}, {delay: RENDER_DELAY}));
 $('reset-parameters').addEventListener('click', () => {
@@ -374,21 +396,12 @@ drawing.addEventListener('click', event => {
 });
 
 $('color-target').addEventListener('change', updateColorControls);
-$('custom-color').addEventListener('input', event => setColor(event.target.value));
-$('hex-color').addEventListener('change', event => setColor(event.target.value));
-$('hex-color').addEventListener('keydown', event => {
-  if (event.key !== 'Enter') return;
-  setColor(event.target.value);
-  event.target.blur();
-});
-$('color-parts').addEventListener('click', () => editColors(c => {
-  selected.parts.forEach((p, i) => { c.parts[p.id] = palette[1 + i % (palette.length - 1)][1]; });
-}));
+$('hue').addEventListener('input', event => setHue(Number(event.target.value)));
 $('reset-colors').addEventListener('click', () => editColors(c => Object.assign(c, defaultInk())));
 
 $('zoom-in').addEventListener('click', () => setZoom(zoom * 1.25));
 $('zoom-out').addEventListener('click', () => setZoom(zoom / 1.25));
-$('fit').addEventListener('click', fitZoom);
+$('reset-drawing').addEventListener('click', resetDrawing);
 viewport.addEventListener('keydown', event => {
   if (!['+', '=', '-', '0'].includes(event.key)) return;
   event.preventDefault();
