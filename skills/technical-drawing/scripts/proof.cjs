@@ -9,7 +9,7 @@ const HIDDEN = .5, PIXELS = 2000, MAX_SPACING = 1.5;
 
 function load(configPath) {
   const base = path.dirname(path.resolve(configPath)), config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  const context = {console};
+  const context = {console, structuredClone};
   context.self = context;
   vm.createContext(context);
   for (const file of [path.join(assets, 'sheet.js'), path.join(assets, 'geometry.js'), path.join(assets, 'projection.js'), ...config.modelScripts.map(f => path.resolve(base, f))]) {

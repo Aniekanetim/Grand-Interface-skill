@@ -474,16 +474,16 @@
     });
     const n = path.length, at = i => path[closed ? (i + n) % n : Math.max(0, Math.min(n - 1, i))];
     const tangents = path.map((_, i) => unit(sub(at(i + 1), at(i - 1))));
-    const transport = (u, t) => unit(sub(u, t.map(k => k * dot(u, t))));
-    const frames = [];
-    let u = unit(cross(tangents[0], Math.abs(tangents[0][2]) < .9 ? [0, 0, 1] : [1, 0, 0]));
-    for (const t of tangents) {
-      u = transport(u, t);
-      frames.push(u);
-    }
+    const transport = (u, from, to) => {
+      const axis = cross(from, to), s2 = dot(axis, axis), c = dot(from, to);
+      const turned = s2 < 1e-18 ? u : u.map((k, i) => k * c + cross(axis, u)[i] + axis[i] * dot(axis, u) * (1 - c) / s2);
+      return unit(sub(turned, to.map(k => k * dot(turned, to))));
+    };
+    const frames = [unit(cross(tangents[0], Math.abs(tangents[0][2]) < .9 ? [0, 0, 1] : [1, 0, 0]))];
+    for (let i = 1; i < n; i++) frames.push(transport(frames[i - 1], tangents[i - 1], tangents[i]));
     let twist = 0;
     if (closed) {
-      const back = transport(frames[n - 1], tangents[0]), t = tangents[0];
+      const back = transport(frames[n - 1], tangents[n - 1], tangents[0]), t = tangents[0];
       twist = Math.atan2(dot(cross(back, frames[0]), t), dot(back, frames[0]));
     }
     const rings = path.map((point, i) => {

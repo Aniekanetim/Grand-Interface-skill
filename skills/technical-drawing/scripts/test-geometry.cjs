@@ -448,4 +448,13 @@ test('Closed sweeps meet without a twist on a three-dimensional loop and screws 
   assert.ok(seam < step * 1.2, 'The seam band twists no more than its neighbours');
   meshIsClosed(G.screw(G.part('screw', 'Screw')));
 });
+test('Sweeps keep their section through right-angle turns', () => {
+  const square = [[-1, -1], [1, -1], [1, 1], [-1, 1]], frame = G.part('frame', 'Frame');
+  G.sweep(frame, [[0, 0, 0], [10, 0, 0], [10, 10, 0], [0, 10, 0]], square, {closed: true});
+  meshIsClosed(frame);
+  for (let r = 0; r < 4; r++) {
+    const ring = frame.vertices.slice(r * 4, r * 4 + 4);
+    for (let k = 0; k < 4; k++) assert.ok(Math.abs(Math.hypot(...G.sub(ring[k], ring[(k + 1) % 4])) - 2) < 1e-9, 'Every ring keeps the section side');
+  }
+});
 console.log(JSON.stringify({passed: checks.length, checks}, null, 2));
