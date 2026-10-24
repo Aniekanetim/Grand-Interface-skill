@@ -1,15 +1,9 @@
 const drawings = JSON.parse(document.getElementById('drawing-data').textContent);
 const $ = id => document.getElementById(id), ns = 'http://www.w3.org/2000/svg';
-const SHEET = {width: 420, height: 297};
+const SHEET = TechnicalSheet;
 const RENDER_DELAY = 120;
 const viewport = $('viewport'), stage = $('stage'), drawing = $('drawing'), selection = $('selection'), selectionBox = $('selection-box');
 const GRAPHITE = '#202020', DEFAULT_HUE = 250, HUE_INK = {lightness: .52, chroma: .11};
-const presets = {
-  technical: {outline: .35, edge: .22, detail: .13, texture: .09, axis: .13},
-  patent: {outline: .24, edge: .15, detail: .10, texture: .065, axis: .1},
-  service: {outline: .5, edge: .28, detail: .16, texture: 0, axis: .16}
-};
-const AXIS_DASH = '6 1 1 1';
 const geometryKeys = ['params', 'explosion', 'isolated'];
 const storageKey = 'technical-drawing-colors-v3';
 
@@ -90,7 +84,7 @@ function mountGeometry(result, subject, target) {
 }
 
 function styleGeometry(group, preset, ink) {
-  const weights = presets[preset], inkFor = el => ink.parts[el.closest('[data-item]')?.dataset.item] || ink.base;
+  const weights = SHEET.linework[preset], inkFor = el => ink.parts[el.closest('[data-item]')?.dataset.item] || ink.base;
   group.style.setProperty('--drawing-ink', ink.base);
   for (const part of group.querySelectorAll('[data-item]')) part.style.setProperty('--drawing-ink', ink.parts[part.dataset.item] || ink.base);
   for (const el of group.querySelectorAll('[data-ink-fill]')) {
@@ -104,7 +98,7 @@ function styleGeometry(group, preset, ink) {
     el.setAttribute('stroke-width', weight);
     el.setAttribute('stroke-linecap', 'butt');
     el.setAttribute('stroke-linejoin', 'round');
-    if (el.dataset.lineRole === 'axis') el.setAttribute('stroke-dasharray', AXIS_DASH);
+    if (el.dataset.lineRole === 'axis') el.setAttribute('stroke-dasharray', SHEET.axisDash);
     el.style.display = weight ? '' : 'none';
   }
 }
@@ -358,6 +352,7 @@ async function download(format, partOnly = false) {
 }
 
 $('hue').style.background = `linear-gradient(to right, ${HUE_STOPS})`;
+selection.setAttribute('viewBox', `0 0 ${SHEET.width} ${SHEET.height}`);
 
 $('subject').addEventListener('change', event => selectDrawing(event.target.value));
 const setView = option => update({explosion: option.dataset.view === 'assembled' ? 0 : 1});

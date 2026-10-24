@@ -73,7 +73,7 @@ Keep occluding faces unmarked and explicitly paper-colored. A filled-ink marker 
 
 Return coordinates in millimeters on the 420 × 297 mm sheet. `TechnicalProjection.render` already fits them, and the viewer draws them unscaled. `render` applies each part's explosion vector scaled by `explosion` and drops parts outside `isolated`, so models pass both options through. Handle them in the model only when spacing or isolation changes the geometry itself.
 
-Treat model code as generator source you control. Sanitize imported SVG before it reaches this boundary, following **Make the standalone page work from disk** in [preview-page.md](preview-page.md).
+Treat model code as generator source you control. Remove scripts and external resources from imported SVG before it reaches this boundary.
 
 ## Build one portable file
 
@@ -83,8 +83,24 @@ Run [scripts/build-viewer.cjs](scripts/build-viewer.cjs) with the configuration 
 node tools/technical-drawing/scripts/build-viewer.cjs drawing.json dist/index.html
 ```
 
-Deliver the resulting HTML alongside `evidence.md`, the configuration, model scripts, dependency lockfile and copies of the skill's `assets/` and `scripts/` folders kept side by side. Record the regeneration command against those copies, such as `node tools/technical-drawing/scripts/build-viewer.cjs drawing.json dist/index.html`, in `evidence.md`.
+Deliver the resulting HTML alongside `evidence.md`, the configuration, model scripts, dependency lockfile and copies of the skill's `assets/` and `scripts/` folders kept side by side.
 
-[assets/viewer.html](assets/viewer.html) owns the shell, [assets/viewer.js](assets/viewer.js) owns interaction state and [assets/export.js](assets/export.js) owns export snapshots. [assets/worker.js](assets/worker.js) runs the models away from the controls, one job at a time.
+[assets/sheet.js](assets/sheet.js) owns the sheet size and linework presets, [assets/viewer.html](assets/viewer.html) owns the shell, [assets/viewer.js](assets/viewer.js) owns interaction state and [assets/export.js](assets/export.js) owns export snapshots. [assets/worker.js](assets/worker.js) runs the models away from the controls, one job at a time.
 
 A newer preview supersedes queued and running ones, and slider input is debounced. Downloads stay disabled until the current drawing is ready.
+
+## Test the controls and the downloaded bytes
+
+For every build, run `node tools/technical-drawing/scripts/check-viewer.cjs dist/index.html check/` from the project folder, with Node 22 or later. It opens the page from disk in headless Chrome, waits for each drawing, screenshots it and fails on errors, missing parts or network requests. Add `--dark` to check the dark appearance.
+
+The page renders in a worker, so a plain headless screenshot taken at load shows an empty page. Interactive checks beyond the script need a DevTools driver that waits until `#render-status` reads `Drawing updated`.
+
+Before delivery, also open the generated page from disk and exercise zoom, reset, presets, spacing, parameters, part selection, isolation, colors and every download. Test wide and narrow viewports, including keyboard access and panel dismissal.
+
+Test system appearance, explicit overrides, reload persistence and return to System. Inspect the drawing, fields and focus indicators in both themes at narrow widths, then export from dark mode to confirm the original ink and paper survive.
+
+Change whole-drawing and individual-part colors, then switch views where available. Download after zooming and scrolling, confirming that every format preserves the complete selected view and its colors.
+
+Check full-page, cropped, transparent and isolated-part exports. Verify PNG pixel dimensions and alpha, plus PDF page count, physical size and vector content. Render the downloaded PDF independently and inspect its labels, fine lines and sheet edges.
+
+If browser testing is unavailable, state that limitation and provide the standalone files for inspection.

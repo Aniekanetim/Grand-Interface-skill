@@ -10,7 +10,7 @@ For an annotated sheet, begin with 12 mm margins and a 24 mm title band. Size th
 
 Use plain white paper and near-black ink, such as `#202020`, for a clean assembly print. Follow an explicit color reference when provided.
 
-Object linework takes its widths from the viewer presets under **Change the ink without changing the object** in [preview-page.md](preview-page.md). Start the marks added around it from these values, a recipe rather than a drafting standard:
+Object linework takes its widths and axis dash from the presets in [assets/sheet.js](assets/sheet.js). Start the marks added around it from these values, a recipe rather than a drafting standard:
 
 | Mark | Paper size |
 | --- | --- |
@@ -33,7 +33,7 @@ Use butt-ended strokes with round joins, as the viewer does. Inspect acute joins
 
 Use continuous lines for visible edges. Hidden edges use short, uniform dashes; centerlines and assembly trails use a long-short pattern.
 
-Start with `stroke-dasharray="2 1"` for hidden edges and `stroke-dasharray="6 1 1 1"` for centerlines. Preserve those lengths in paper coordinates.
+Start with `stroke-dasharray="2 1"` for hidden edges and the sheet's `axisDash` for centerlines. Preserve those lengths in paper coordinates.
 
 Place centerlines slightly beyond the feature they identify. Terminate trails at meaningful assembly anchors, and use solid leaders for item identification.
 
@@ -65,11 +65,7 @@ This shell establishes physical units and line roles without prescribing the she
         stroke-linecap: butt;
         stroke-linejoin: round;
       }
-      [data-line-role="outline"] { stroke-width: .35; }
-      [data-line-role="edge"] { stroke-width: .22; }
-      [data-line-role="detail"] { stroke-width: .13; }
-      [data-line-role="texture"] { stroke-width: .09; }
-      [data-line-role="axis"] { stroke-width: .13; stroke-dasharray: 6 1 1 1; }
+      /* one stroke-width rule per line role, plus the axis dash */
       .leader { stroke-width: .16; }
       text { fill: #202020; font-family: Arial, sans-serif; font-size: 3px; }
     </style>
@@ -82,6 +78,14 @@ This shell establishes physical units and line roles without prescribing the she
 ```
 
 Paste `render` markup into `views` as it comes out. Its paths carry `data-line-role`, which the style inks. Replace the placeholder title, description and empty groups with the actual drawing. Here SVG font pixels are user units and inherit the root's millimeter mapping.
+
+Generate the role rules where the shell's comment sits, from the sheet module rather than copied numbers:
+
+```js
+const SHEET = require('./tools/technical-drawing/assets/sheet.js');
+const roles = Object.entries(SHEET.linework.technical).map(([role, width]) => `[data-line-role="${role}"] { stroke-width: ${width}; }`).join('\n');
+const axis = `[data-line-role="axis"] { stroke-dasharray: ${SHEET.axisDash}; }`;
+```
 
 Generate projected coordinates directly in sheet space when possible. Nested scale transforms otherwise multiply stroke widths along with geometry. To inset a rendered view at a smaller size, wrap its markup in a translate and scale transform and divide its stroke widths by that scale.
 

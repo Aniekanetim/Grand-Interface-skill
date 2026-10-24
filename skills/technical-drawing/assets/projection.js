@@ -1,8 +1,9 @@
 (function (root) {
   'use strict';
-  const G = typeof module !== 'undefined' && module.exports ? require('./geometry.js') : root.TechnicalGeometry;
+  const node = typeof module !== 'undefined' && module.exports;
+  const G = node ? require('./geometry.js') : root.TechnicalGeometry;
+  const SHEET = node ? require('./sheet.js') : root.TechnicalSheet;
   const {add, sub, dot, cross, ROLES} = G;
-  const SHEET = {width: 420, height: 297, margin: 28};
 
   function createCamera({azimuth = -135, elevation = Math.asin(1 / Math.sqrt(3)) * 180 / Math.PI, roll = 16} = {}) {
     if (![azimuth, elevation, roll].every(Number.isFinite) || Math.abs(elevation) > 90) throw Error('Invalid camera angles');
@@ -90,41 +91,41 @@
       if (p.triangles.some(f => f.length !== 3 || f.some(i => !Number.isInteger(i) || i < 0 || i >= p.vertices.length))) {
         throw Error(`Part ${p.id} has a triangle that references a missing vertex`);
       }
-      const points = [...p.vertices, ...p.lines.flatMap(l => [l.a, l.b])];
-      if (points.some(v => !Array.isArray(v) || v.length !== 3 || !v.every(Number.isFinite))) throw Error(`Part ${p.id} has a point without three finite coordinates`);
+      if (!p.vertices.every(G.isPoint) || !p.lines.every(l => G.isPoint(l.a) && G.isPoint(l.b))) {
+        throw Error(`Part ${p.id} has a point without three finite coordinates`);
+      }
     }
     const shift = (p, amount) => p.explosion.map(n => n * amount);
     const meshes = visibleParts.map(p => ({part: p, offset: shift(p, explosion), points: p.vertices.map(v => view.project(add(v, shift(p, explosion))))}));
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const extend = point => {
+      const [x, y] = view.project(point);
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    };
     const byId = new Map(parts.map(p => [String(p.id), p]));
     const trailEnd = (point, id, amount) => {
-      if (!Array.isArray(point) || point.length !== 3 || !point.every(Number.isFinite)) throw Error('Trail ends need three finite coordinates');
+      G.point3(point, 'A trail end');
       if (id === undefined || id === null) return point;
       if (!byId.has(String(id))) throw Error(`Trail refers to unknown part ${id}`);
       return add(point, shift(byId.get(String(id)), amount));
     };
-    if (isolated === null) {
-      for (const t of trails) {
-        for (const amount of new Set([explosion, fitExplosion])) {
-          for (const [x, y] of [trailEnd(t.a, t.from, amount), trailEnd(t.b, t.to, amount)].map(q => view.project(q))) {
-            minX = Math.min(minX, x);
-            minY = Math.min(minY, y);
-            maxX = Math.max(maxX, x);
-            maxY = Math.max(maxY, y);
-          }
+    for (const amount of new Set([explosion, fitExplosion])) {
+      if (isolated === null) {
+        for (const t of trails) {
+          extend(trailEnd(t.a, t.from, amount));
+          extend(trailEnd(t.b, t.to, amount));
         }
       }
-    }
-    for (const p of visibleParts) {
-      for (const amount of new Set([explosion, fitExplosion])) {
+      for (const p of visibleParts) {
         const offset = shift(p, amount);
-        for (const v of [...p.vertices, ...p.lines.flatMap(l => [l.a, l.b])]) {
-          const [x, y] = view.project(add(v, offset));
-          minX = Math.min(minX, x);
-          minY = Math.min(minY, y);
-          maxX = Math.max(maxX, x);
-          maxY = Math.max(maxY, y);
+        for (const v of p.vertices) extend(add(v, offset));
+        for (const l of p.lines) {
+          extend(add(l.a, offset));
+          extend(add(l.b, offset));
         }
       }
     }

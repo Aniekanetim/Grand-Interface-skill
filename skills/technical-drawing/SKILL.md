@@ -106,9 +106,9 @@ If rendering is unavailable, deliver the editable source and explicitly mark vis
 
 ## 6. Package and test the preview page
 
-Build the standalone page with [viewer-assets.md](viewer-assets.md), then work through **Test the controls and the downloaded bytes** in [preview-page.md](preview-page.md). Its script covers rendering, and its manual checks cover downloads. Read the rest of that file only when building or integrating a viewer of your own.
+Build the standalone page and work through **Test the controls and the downloaded bytes** in [viewer-assets.md](viewer-assets.md). Its script covers rendering, and its manual checks cover downloads. A standalone page opens without a build step or running server.
 
-Use the project's existing interface components when integrating there. A standalone page opens without a build step or running server.
+When integrating into a project's interface or replacing the bundled page, build to [preview-page.md](preview-page.md).
 
 This step is done when the available controls work and every download preserves the selected geometry, linework and colors. Report unavailable formats or unverified browser behavior explicitly.
 

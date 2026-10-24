@@ -41,7 +41,7 @@ function build(configPath, outputPath) {
   validate(config);
   const resolve = file => path.resolve(base, file), deps = resolve(config.dependencies);
   const dependency = file => path.join(deps, file);
-  const worker = [asset('geometry.js'), asset('projection.js'), ...config.modelScripts.map(f => read(resolve(f))), asset('worker.js')].join('\n');
+  const worker = [asset('sheet.js'), asset('geometry.js'), asset('projection.js'), ...config.modelScripts.map(f => read(resolve(f))), asset('worker.js')].join('\n');
   const replacements = {
     __INTER_LICENSE__: script(read(dependency('@fontsource-variable/inter/LICENSE'))),
     __INTER_FONT__: fs.readFileSync(dependency('@fontsource-variable/inter/files/inter-latin-wght-normal.woff2')).toString('base64'),
@@ -50,6 +50,7 @@ function build(configPath, outputPath) {
     __SVG2PDF__: script(read(dependency('svg2pdf.js/dist/svg2pdf.umd.min.js'))),
     __WORKER_SOURCE__: json(worker),
     __THEME_SCRIPT__: script(asset('theme.js')),
+    __SHEET_SCRIPT__: script(asset('sheet.js')),
     __EXPORT_SCRIPT__: script(asset('export.js')),
     __RENDER_QUEUE_SCRIPT__: script(asset('render-queue.js')),
     __VIEWER_SCRIPT__: script(asset('viewer.js'))

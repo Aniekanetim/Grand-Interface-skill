@@ -27,6 +27,11 @@
     if (!Number.isInteger(n) || n < min || n > max) throw Error(`Count must be ${min}–${max}`);
     return n;
   };
+  const isPoint = v => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
+  const point3 = (v, what) => {
+    if (!isPoint(v)) throw Error(`${what} needs three finite coordinates`);
+    return v;
+  };
   const lineRole = role => {
     if (!ROLES.includes(role)) throw Error(`Line role must be one of ${ROLES.join(', ')}`);
     return role;
@@ -34,14 +39,13 @@
 
   function part(id, name, explosion = [0, 0, 0]) {
     if (!name || !String(id)) throw Error('A part needs a stable ID and name');
-    if (!Array.isArray(explosion) || explosion.length !== 3) throw Error('Explosion needs three coordinates');
-    explosion.forEach(finite);
+    point3(explosion, 'An explosion');
     return {id, name, explosion, vertices: [], triangles: [], lines: []};
   }
 
   function line(p, a, b, role = 'edge') {
-    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== 3 || b.length !== 3) throw Error('Line ends need three coordinates');
-    [...a, ...b].forEach(finite);
+    point3(a, 'A line end');
+    point3(b, 'A line end');
     lineRole(role);
     if (Math.hypot(...sub(a, b)) > 1e-9) p.lines.push({a, b, role});
   }
@@ -226,9 +230,7 @@
   }
 
   function transform(p, {origin = [0, 0, 0], xAxis = [1, 0, 0], yAxis = [0, 1, 0], zAxis = [0, 0, 1]} = {}) {
-    const vectors = [origin, xAxis, yAxis, zAxis];
-    if (vectors.some(v => !Array.isArray(v) || v.length !== 3)) throw Error('A frame needs three-coordinate vectors');
-    vectors.flat().forEach(finite);
+    [origin, xAxis, yAxis, zAxis].forEach(v => point3(v, 'A frame vector'));
     const orthonormal = [xAxis, yAxis, zAxis].every(v => Math.abs(Math.hypot(...v) - 1) <= 1e-6) && Math.abs(dot(xAxis, yAxis)) <= 1e-6;
     if (!orthonormal || Math.hypot(...sub(cross(xAxis, yAxis), zAxis)) > 1e-6) throw Error('Frame axes must be right-handed and orthonormal');
     const rotate = v => origin.map((_, i) => v[0] * xAxis[i] + v[1] * yAxis[i] + v[2] * zAxis[i]);
@@ -296,14 +298,14 @@
       && turn(points[b], points[c], points[v]) >= -areaTolerance
       && turn(points[c], points[a], points[v]) >= -areaTolerance;
     while (remaining.length > 3) {
-      const neighbours = i => [remaining[(i + remaining.length - 1) % remaining.length], remaining[i], remaining[(i + 1) % remaining.length]];
+      const neighbors = i => [remaining[(i + remaining.length - 1) % remaining.length], remaining[i], remaining[(i + 1) % remaining.length]];
       const ear = remaining.findIndex((_, i) => {
-        const [a, b, c] = neighbours(i);
+        const [a, b, c] = neighbors(i);
         return turn(points[a], points[b], points[c]) > areaTolerance
           && !remaining.some(v => !same(v, a) && !same(v, b) && !same(v, c) && inside(a, b, c, v));
       });
       if (ear < 0) throw Error('Could not triangulate extrusion profile');
-      triangles.push(neighbours(ear));
+      triangles.push(neighbors(ear));
       remaining.splice(ear, 1);
     }
     triangles.push([...remaining]);
@@ -391,24 +393,18 @@
     return part('piece', 'Construction piece');
   }
 
+  const frame = (xAxis, yAxis, zAxis) => ({xAxis, yAxis, zAxis});
+  const AXES = {x: frame([1, 0, 0], [0, 1, 0], [0, 0, 1]), y: frame([0, 1, 0], [0, 0, 1], [1, 0, 0]), z: frame([0, 0, 1], [1, 0, 0], [0, 1, 0])};
+  const PLANES = {xy: AXES.x, xz: frame([1, 0, 0], [0, 0, 1], [0, -1, 0]), yz: AXES.y};
+
   function along(axis) {
-    const frames = {
-      x: {xAxis: [1, 0, 0], yAxis: [0, 1, 0], zAxis: [0, 0, 1]},
-      y: {xAxis: [0, 1, 0], yAxis: [0, 0, 1], zAxis: [1, 0, 0]},
-      z: {xAxis: [0, 0, 1], yAxis: [1, 0, 0], zAxis: [0, 1, 0]}
-    };
-    if (!frames[axis]) throw Error('Axis must be x, y or z');
-    return frames[axis];
+    if (!AXES[axis]) throw Error('Axis must be x, y or z');
+    return structuredClone(AXES[axis]);
   }
 
   function plane(name) {
-    const frames = {
-      xy: {xAxis: [1, 0, 0], yAxis: [0, 1, 0], zAxis: [0, 0, 1]},
-      xz: {xAxis: [1, 0, 0], yAxis: [0, 0, 1], zAxis: [0, -1, 0]},
-      yz: {xAxis: [0, 1, 0], yAxis: [0, 0, 1], zAxis: [1, 0, 0]}
-    };
-    if (!frames[name]) throw Error('Plane must be xy, xz or yz');
-    return frames[name];
+    if (!PLANES[name]) throw Error('Plane must be xy, xz or yz');
+    return structuredClone(PLANES[name]);
   }
 
   function box(p, [x0, y0, z0], [x1, y1, z1], {radius = 0, role = 'edge'} = {}) {
@@ -471,10 +467,7 @@
   function sweep(p, path, section, {closed = false, caps = !closed, lines = closed ? 'none' : 'ends', role = 'edge'} = {}) {
     if (!Array.isArray(path) || path.length < (closed ? 3 : 2)) throw Error('A sweep path needs at least two points, or three when closed');
     if (!Array.isArray(section) || section.length < 3) throw Error('A sweep section needs at least three points');
-    path.forEach(v => {
-      if (!Array.isArray(v) || v.length !== 3) throw Error('Sweep path points need three coordinates');
-      v.forEach(finite);
-    });
+    path.forEach(v => point3(v, 'A sweep path point'));
     section.forEach(v => {
       if (!Array.isArray(v) || v.length !== 2) throw Error('Sweep section points need two coordinates');
       v.forEach(finite);
@@ -515,10 +508,7 @@
     count(n, 3, 4096);
     for (const ring of rings) {
       if (!Array.isArray(ring) || ring.length !== n) throw Error('Loft rings need equal point counts');
-      for (const v of ring) {
-        if (!Array.isArray(v) || v.length !== 3) throw Error('Loft points need three coordinates');
-        v.forEach(finite);
-      }
+      ring.forEach(v => point3(v, 'A loft point'));
     }
     const base = p.vertices.length, first = p.triangles.length;
     rings.forEach(ring => p.vertices.push(...ring.map(v => [...v])));
@@ -546,7 +536,7 @@
     return p;
   }
 
-  const api = {TAU, ROLES, lineRole, add, sub, dot, cross, unit, part, line, ringPoints, ring, lathe, helix, knurl, spring, screw, roundedRectangle, extrude, loft, polyline, transform, merge, piece, along, plane, box, circle, sweep, ringAngles, roundedRing};
+  const api = {TAU, ROLES, lineRole, isPoint, point3, add, sub, dot, cross, unit, part, line, ringPoints, ring, lathe, helix, knurl, spring, screw, roundedRectangle, extrude, loft, polyline, transform, merge, piece, along, plane, box, circle, sweep, ringAngles, roundedRing};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.TechnicalGeometry = api;
 })(globalThis);

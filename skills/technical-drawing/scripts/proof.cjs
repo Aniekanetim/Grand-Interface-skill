@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm'), {execFileSync} = require('node:child_process');
+const {has, findChrome} = require('./commands.cjs');
 
 const assets = path.resolve(__dirname, '../assets');
-const WIDTHS = {outline: .35, edge: .22, detail: .13, texture: .09, axis: .13};
-const AXIS_DASH = '6 1 1 1';
+const SHEET = require(path.join(assets, 'sheet.js'));
+const SHEET_BOX = [0, 0, SHEET.width, SHEET.height];
 const HIDDEN = .5, PIXELS = 2000, MAX_SPACING = 1.5;
 
 function load(configPath) {
@@ -11,7 +12,7 @@ function load(configPath) {
   const context = {console};
   context.self = context;
   vm.createContext(context);
-  for (const file of [path.join(assets, 'geometry.js'), path.join(assets, 'projection.js'), ...config.modelScripts.map(f => path.resolve(base, f))]) {
+  for (const file of [path.join(assets, 'sheet.js'), path.join(assets, 'geometry.js'), path.join(assets, 'projection.js'), ...config.modelScripts.map(f => path.resolve(base, f))]) {
     vm.runInContext(fs.readFileSync(file, 'utf8'), context, {filename: file});
   }
   return {config, models: context.DrawingModels ?? {}};
@@ -35,23 +36,15 @@ function inkLengths(markup) {
   return lengths;
 }
 
-function sheet(markup, title, viewBox = '0 0 420 297', size = 'width="420mm" height="297mm"') {
-  const styles = Object.entries(WIDTHS).map(([role, w]) => `[data-line-role="${role}"]{stroke-width:${w}}`).join('');
+function sheet(markup, title, viewBox = SHEET_BOX.join(' '), size = `width="${SHEET.width}mm" height="${SHEET.height}mm"`) {
+  const styles = Object.entries(SHEET.linework.technical).map(([role, w]) => `[data-line-role="${role}"]{stroke-width:${w}}`).join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" ${size} viewBox="${viewBox}"><title>${title.replaceAll('&', '&amp;').replaceAll('<', '&lt;')}</title>`
-    + `<style>path{fill:none;stroke:#202020;stroke-linecap:butt;stroke-linejoin:round}${styles}[data-line-role="axis"]{stroke-dasharray:${AXIS_DASH}}</style>`
+    + `<style>path{fill:none;stroke:#202020;stroke-linecap:butt;stroke-linejoin:round}${styles}[data-line-role="axis"]{stroke-dasharray:${SHEET.axisDash}}</style>`
     + `<rect x="-1000" y="-1000" width="3000" height="3000" fill="#fff"/>${markup}</svg>`;
 }
 
 function rasterizer() {
-  const has = command => {
-    try {
-      execFileSync('which', [command], {stdio: 'ignore'});
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  const chrome = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', 'google-chrome', 'chromium'].find(c => c.startsWith('/') ? fs.existsSync(c) : has(c));
+  const chrome = findChrome();
   const named = (name, run) => Object.assign(run, {label: name});
   if (has('rsvg-convert')) return named('rsvg-convert', (svg, png) => execFileSync('rsvg-convert', ['-w', String(PIXELS), '-o', png, svg]));
   if (has('resvg')) return named('resvg', (svg, png) => execFileSync('resvg', ['-w', String(PIXELS), svg, png]));
@@ -65,7 +58,7 @@ function rasterizer() {
   return null;
 }
 
-function writePng(rasterize, markup, title, file, [x, y, w, h] = [0, 0, 420, 297]) {
+function writePng(rasterize, markup, title, file, [x, y, w, h] = SHEET_BOX) {
   const height = Math.round(PIXELS * h / w), pixels = file.replace(/\.png$/, '.px.svg');
   fs.writeFileSync(pixels, sheet(markup, title, `${x} ${y} ${w} ${h}`, `width="${PIXELS}" height="${height}"`));
   try {
@@ -158,7 +151,7 @@ function proof(configPath, outDir, {png = true, quick = false, crop = null, only
     if (lowest) console.log(`${d.id} exploded: the most hidden part, "${lowest.id}", shows ${Math.round(lowest.ratio * 100)}% of its own linework`);
   }
   if (rasterize && !crop && files.length > 2) {
-    const pngs = files.map(f => f.replace(/\.svg$/, '.png')).filter(f => fs.existsSync(f)), columns = 3, w = 420, h = 297, gap = 8;
+    const pngs = files.map(f => f.replace(/\.svg$/, '.png')).filter(f => fs.existsSync(f)), columns = 3, w = SHEET.width, h = SHEET.height, gap = 8;
     const rows = Math.ceil(pngs.length / columns), width = columns * w + (columns + 1) * gap, height = rows * (h + 14) + (rows + 1) * gap;
     const tiles = pngs.map((f, i) => {
       const x = gap + (i % columns) * (w + gap), y = gap + Math.floor(i / columns) * (h + 14 + gap);

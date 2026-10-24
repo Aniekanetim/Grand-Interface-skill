@@ -1,21 +1,9 @@
 #!/usr/bin/env node
-const fs = require('node:fs'), os = require('node:os'), path = require('node:path'), {spawn, execFileSync} = require('node:child_process');
+const fs = require('node:fs'), os = require('node:os'), path = require('node:path'), {spawn} = require('node:child_process');
+const {findChrome} = require('./commands.cjs');
 
 const TIMEOUT = 60000;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-function findChrome() {
-  const candidates = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Chromium.app/Contents/MacOS/Chromium', 'google-chrome', 'chromium', 'chromium-browser'];
-  return candidates.find(c => {
-    if (c.startsWith('/')) return fs.existsSync(c);
-    try {
-      execFileSync('which', [c], {stdio: 'ignore'});
-      return true;
-    } catch {
-      return false;
-    }
-  });
-}
 
 async function connect(profile) {
   const portFile = path.join(profile, 'DevToolsActivePort'), start = Date.now();

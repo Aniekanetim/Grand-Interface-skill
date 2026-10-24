@@ -40,7 +40,7 @@ Choose only the features supported by the evidence record. Conceptual constructi
 
 ## Build what the helpers cannot
 
-Plates with holes, bent sheet, tori and blended housings need a custom mesh. Build them as grids of rings with equal point counts, then join neighbouring rings into triangles.
+Plates with holes, bent sheet, tori and blended housings need a custom mesh. Build them as grids of rings with equal point counts, then join neighboring rings into triangles.
 
 Sample every ring of one surface on the same parameter values. `roundedRing` with shared `ringAngles` gives a square ring and a round ring matching points, so they loft into a frame with a round bore and no slivers.
 
