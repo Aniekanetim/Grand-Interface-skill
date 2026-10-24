@@ -108,4 +108,10 @@ A CSS transform alone does not reserve the enlarged sheet's layout space. Resize
 
 Fitting the sheet to the viewport is a viewing convenience, not a claim that the drawing appears at its printed scale. Preserve physical dimensions in the SVG and PDF files.
 
-Test a viewer of your own with the manual checks in **Test the controls and the downloaded bytes** in [viewer-assets.md](viewer-assets.md).
+## Test every control of a viewer of your own
+
+Open the page from disk and exercise zoom, reset, presets, spacing, parameters, part selection, isolation, colors and every download. Test wide and narrow viewports, including keyboard access and panel dismissal.
+
+Test system appearance, explicit overrides, reload persistence and return to System. Inspect the drawing, fields and focus indicators in both themes at narrow widths, then export from dark mode to confirm the original ink and paper survive.
+
+Then run the download checks in **Test the controls and the downloaded bytes** in [viewer-assets.md](viewer-assets.md).

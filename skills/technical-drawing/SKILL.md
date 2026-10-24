@@ -1,6 +1,6 @@
 ---
 name: technical-drawing
-description: Creates precise static technical drawings of physical objects, with coherent views and fine linework. Delivers a blank-page viewer with zoom, editable colors and SVG, PNG and PDF downloads.
+description: Creates precise static technical drawings of physical objects, with coherent views and fine linework.
 ---
 
 # Technical drawing
@@ -9,7 +9,7 @@ This skill creates technical drawings from objects, descriptions, photographs or
 
 Treat geometry and annotation correspondence as exact. Treat sheet proportions and line weights as starting recipes, adjusted to the reference and output size.
 
-`better-typography` owns text rendering, `better-colors` owns palette and `better-accessibility` owns accessible embedding. `better-layout` owns the surrounding interface, while `build-design` owns implementing UI from a design.
+`better-typography` owns text rendering, `better-colors` owns palette and `better-accessibility` owns accessible embedding, while `better-layout` owns the surrounding interface.
 
 ## 1. Read the object and the reference separately
 
@@ -21,7 +21,7 @@ For an assembly print, the characteristic finish is usually dark contours on pla
 
 Collect the visible silhouette, component boundaries, fastening points, repeated features and interfaces. Inspect supplied CAD or authoritative product drawings when available, especially before depicting hidden construction.
 
-Keep the evidence record in `evidence.md` beside the drawing source. Give each feature group a row classified by one of these evidence kinds, then add the regeneration commands below the table:
+Keep the evidence record in `evidence.md` beside the drawing source. Give each feature group a row classified by one of these evidence kinds, then add the commands that rebuild and proof the drawing below the table:
 
 | Evidence | How to use it |
 | --- | --- |
@@ -34,11 +34,11 @@ Choose the least speculative route that still fulfils the request. A styling ref
 
 For a visual illustration, proceed with stated assumptions. For a manufacturing drawing, obtain missing dimensions, units, fits and the required drafting standard before presenting it as usable for fabrication.
 
-This step is done when the subject, evidence limits, intended use and output size are explicit. Default to a local preview page with SVG, PNG and PDF downloads unless the user requests a narrower deliverable.
+This step is done when `evidence.md` classifies every feature group and names the intended use and output size. Default to a local preview page with SVG, PNG and PDF downloads unless the user requests a narrower deliverable.
 
 ## 2. Choose views that explain the construction
 
-Choose the smallest view set that answers the request. [views-and-annotations.md](views-and-annotations.md) holds each view's conventions.
+Choose the smallest view set that answers the request. Read the conventions for each chosen view in [views-and-annotations.md](views-and-annotations.md), and read [exploded-views.md](exploded-views.md) before setting any explosion vector.
 
 | The drawing needs to explain | Start with |
 | --- | --- |
@@ -51,19 +51,17 @@ The bundled viewer switches between assembled and exploded views for any drawing
 
 The bundled viewer places no text, balloons or dimension annotations. An annotated sheet is a separate SVG composed around the rendered views, so build one only when the user asks for it.
 
-For an annotated sheet, reserve annotation space before adding detail. Landscape A3 with a dominant exploded view, assembled inset and parts list suits an assembly manual.
-
 Keep object animation and simulation out of scope unless requested.
 
 This step is done when each view has a purpose and a scale policy. Annotated sheets also need allocated rectangles for their views and labels.
 
 ## 3. Construct one object, then project it
 
-Derive every view from one model, including the parts list when the drawing needs one. [geometry.md](geometry.md) holds the modeling rules that apply whatever builds the geometry.
-
-Build with the bundled helpers in [geometry-library.md](geometry-library.md) by default. They construct meshes, remove hidden lines and feed the viewer directly. Prefer CAD projection when a model already exists or the object needs boolean cuts the helpers cannot make.
-
 Set up the project before modeling. Copy the skill's `assets/` and `scripts/` folders into `tools/technical-drawing/`, leaving out the `test-*.cjs` files, which check the skill itself. Write `drawing.json` and a model script as [viewer-assets.md](viewer-assets.md) describes under **Describe the drawings and their controls** and **Implement the model boundary**.
+
+Derive every view from one model, including the parts list when the drawing needs one. Read [geometry.md](geometry.md) before modeling, since its rules apply whatever builds the geometry.
+
+Build with the bundled helpers in [geometry-library.md](geometry-library.md) by default. They construct meshes, remove hidden lines and feed the viewer directly. Prefer CAD projection when a model already exists or the object needs boolean cuts the helpers cannot make. Its projected SVG enters the viewer as the `{markup}` result that **Implement the model boundary** describes.
 
 Build in this order:
 
@@ -80,19 +78,9 @@ This step is done when corresponding features agree across views and every separ
 
 ## 4. Ink the drawing and add requested annotations
 
-With the bundled viewer, the renderer and viewer already handle line roles and paper size. Read [sheet-and-svg.md](sheet-and-svg.md) when composing an annotated sheet or exporting without the viewer.
+With the bundled viewer, the renderer and viewer already ink line roles at paper size. Identify illustrative construction in the drawing's `description` and leave its `concept` flag on.
 
-Draw component edges with a consistent hierarchy. Let changes in line weight, visibility and spacing describe depth. Use hatching only for sectioned material.
-
-For annotated assemblies, follow **Attach each balloon to one item** and **Dimension only what is established** in [views-and-annotations.md](views-and-annotations.md).
-
-When labels are requested, lay them out before finalizing view positions. Adjust the view or route the leader when text collides, rather than shrinking annotations until they disappear.
-
-Keep borders, titles, callouts and parts tables out of the default artwork. On requested technical sheets, add only metadata with established values.
-
-Keep sheet notes about the object and its assembly. Put rendering methods and verification details in the delivery message.
-
-Identify illustrative construction in the drawing's `description` and leave its `concept` flag on. On annotated sheets, include one visible status note. Leave unknown tolerances, material specifications, approval signatures and compliance claims absent.
+For an annotated sheet or an export without the viewer, read [sheet-and-svg.md](sheet-and-svg.md) and compose the sheet to it.
 
 This step is done when the drawing remains clear at its intended size and every requested annotation can be traced to its feature.
 
@@ -106,7 +94,7 @@ If rendering is unavailable, deliver the editable source and explicitly mark vis
 
 ## 6. Package and test the preview page
 
-Build the standalone page and work through **Test the controls and the downloaded bytes** in [viewer-assets.md](viewer-assets.md). Its script covers rendering, and its manual checks cover downloads. A standalone page opens without a build step or running server.
+Build the standalone page and run the checks in **Test the controls and the downloaded bytes** in [viewer-assets.md](viewer-assets.md). Its script covers rendering, and its download checks cover this drawing's files. A standalone page opens without a build step or running server.
 
 When integrating into a project's interface or replacing the bundled page, build to [preview-page.md](preview-page.md).
 
@@ -127,8 +115,6 @@ This step is done when the available controls work and every download preserves 
 | A title block claims a scale the fitted view cannot preserve | Use `NTS`, or compute and verify the physical output scale |
 | A photograph becomes an unexplained detailed interior | Remove unsupported construction or mark it as illustrative |
 | Slots merge into black bars in the preview | Enlarge the view, simplify the feature or make a detail inset |
-| A download loses chosen colors or contains only the zoomed crop | Export the complete selected view from its current drawing state |
-| PDF download opens a print dialog | Generate a PDF file or label the action as printing |
 
 ## Deliver the drawing with its source
 

@@ -95,11 +95,7 @@ For every build, run `node tools/technical-drawing/scripts/check-viewer.cjs dist
 
 The page renders in a worker, so a plain headless screenshot taken at load shows an empty page. Interactive checks beyond the script need a DevTools driver that waits until `#render-status` reads `Drawing updated`.
 
-Before delivery, also open the generated page from disk and exercise zoom, reset, presets, spacing, parameters, part selection, isolation, colors and every download. Test wide and narrow viewports, including keyboard access and panel dismissal.
-
-Test system appearance, explicit overrides, reload persistence and return to System. Inspect the drawing, fields and focus indicators in both themes at narrow widths, then export from dark mode to confirm the original ink and paper survive.
-
-Change whole-drawing and individual-part colors, then switch views where available. Download after zooming and scrolling, confirming that every format preserves the complete selected view and its colors.
+The bundled controls and appearance are the skill's own code and are tested with it, so test what this drawing adds. Open the generated page from disk and change whole-drawing and individual-part colors, then switch views where available. Download after zooming and scrolling, confirming that every format preserves the complete selected view and its colors.
 
 Check full-page, cropped, transparent and isolated-part exports. Verify PNG pixel dimensions and alpha, plus PDF page count, physical size and vector content. Render the downloaded PDF independently and inspect its labels, fine lines and sheet edges.
 

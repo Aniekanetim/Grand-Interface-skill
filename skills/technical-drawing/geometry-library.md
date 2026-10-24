@@ -34,7 +34,7 @@ The helpers run in Node through `require()` and in a browser or worker through `
 | `line(part, a, b, role)` | Adds one feature segment between two `[x, y, z]` points |
 
 ```js
-const G = require('./geometry.js');
+const G = require('./tools/technical-drawing/assets/geometry.js');
 const sleeve = G.part('sleeve', 'Knurled sleeve', [25, 0, 0]);
 G.lathe(sleeve, [[0, 5], [30, 5], [30, 3], [0, 3]]);
 G.knurl(sleeve, {x0: 2, x1: 28, radius: 5.01, starts: 12, pitch: 40});
@@ -105,7 +105,7 @@ A part with feature lines and no triangles still fits the page, which suits a ma
 ## Project visible ink from the mesh
 
 ```js
-const {render} = require('./projection.js');
+const {render} = require('./tools/technical-drawing/assets/projection.js');
 const {markup} = render([sleeve], {explosion: 0.6, isolated: null});
 ```
 

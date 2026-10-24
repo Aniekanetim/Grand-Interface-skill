@@ -6,7 +6,7 @@ Use one SVG user unit per millimeter of paper. A landscape A3 sheet starts with 
 
 This file covers sheets composed by hand around rendered views, such as an annotated assembly print. The bundled renderer fits the object inside a 28 mm margin with no title band.
 
-For an annotated sheet, begin with 12 mm margins and a 24 mm title band. Size the object before placing a border or table.
+For an annotated sheet, begin with 12 mm margins and a 24 mm title band. Size the object before placing a border or table, and reserve rectangles for views and labels before adding detail. Landscape A3 with a dominant exploded view, assembled inset and parts list suits an assembly manual.
 
 Use plain white paper and near-black ink, such as `#202020`, for a clean assembly print. Follow an explicit color reference when provided.
 
@@ -38,6 +38,14 @@ Start with `stroke-dasharray="2 1"` for hidden edges and the sheet's `axisDash` 
 Place centerlines slightly beyond the feature they identify. Terminate trails at meaningful assembly anchors, and use solid leaders for item identification.
 
 Add sheet grids, zone labels or decorative rules only when the user's template needs them.
+
+## Put only established facts on the sheet
+
+Lay labels out before finalizing view positions. When text collides, adjust the view or route the leader rather than shrinking annotations until they disappear. Balloons and dimensions follow **Attach each balloon to one item** and **Dimension only what is established** in [views-and-annotations.md](views-and-annotations.md).
+
+Add only metadata with established values. Keep sheet notes about the object and its assembly, and put rendering methods and verification details in the delivery message.
+
+A concept sheet carries one visible status note. Leave unknown tolerances, material specifications, approval signatures and compliance claims absent.
 
 ## Keep the exported SVG self-contained
 
