@@ -12,11 +12,25 @@ Choose gaps in paper space after projection. Start with 8–15 mm of clear space
 
 Keep stacks such as screw, washer, cover and boss coaxial. Show the real locating features at both ends of an assembly trail.
 
-Use fine chain lines for necessary trails and omit redundant ones. Stop trails at their attachment features or conceal them behind opaque parts.
+Use fine chain lines for necessary trails and omit redundant ones. Stop trails at their attachment features or conceal them behind opaque parts. The renderer draws them through **Draw axes and assembly trails** in [geometry-library.md](geometry-library.md).
+
+A part nested inside another clears it only when its travel exceeds the outer part's projected depth. Judge the gap between silhouettes in the proof, not between the parts' faces in the model.
+
+Put small features on the side of a lifted part away from the viewer, toward the front of the page. A post behind a lever vanishes once the lever rises.
+
+Hold fasteners just clear of their holes. A screw sent to the end of a vertical stack lands over unrelated parts and stops pointing at its hole. When the part it joins also moves, combine both motions into one diagonal vector.
+
+An internal part at the back of an enclosure rises behind the lifted shell. Place tall internals toward the viewer's side, raise the shell further or drop a part that only obscures the others.
+
+Coaxial discs at diameter `D` clear each other when their center spacing exceeds `D × tan(elevation)` plus their thickness. A deep stack becomes a tall column using a third of landscape A3, so lower the elevation or accept the narrow composition.
+
+For a long object, explode along its axis and move a secondary mechanism to a parallel row joined by a trail. To set a group beside the stack without changing its depth, offset it along the camera's right vector from **Know which way the camera looks** in [geometry.md](geometry.md). When a straight trail between rows would cross parts, leave the rows unjoined with parallel axes. Fit the whole drawing before judging page use, since a long diagonal leaves empty corners.
+
+Drop a trail that crosses an unrelated part or ends inside a cavity. A trail earns its place by connecting two visible locating features.
+
+Each part takes one explosion vector. When members of a group separate, such as lens elements in their cell, make each a part and name it within the group, such as `Front group, element 1`.
 
 An explosion should reveal mating surfaces, not just spread silhouettes across the page. Preserve enough assembled context to explain where each group belongs.
-
-These relationships follow [Autodesk's exploded-view model](https://help.autodesk.com/cloudhelp/2025/ENU/Inventor-Help/files/GUID-2569BBA6-816B-4656-9AC9-ABB9E1DC43C0.htm). Its item numbers connect the drawing to a parts list.
 
 ## Align orthographic views
 
@@ -37,8 +51,6 @@ Hatch the solid regions intersected by the plane. Leave holes, passages and open
 For an illustrative section, start with 45° hatching at 2–3 mm spacing on paper. Enlarge narrow regions or adjust spacing before they become solid black.
 
 For formal drafting, check the chosen standard's exceptions for ribs, shafts and fasteners. A visually plausible cutaway does not establish standards compliance.
-
-The [MIT drawing handbook](https://ocw.mit.edu/courses/2-007-design-and-manufacturing-i-spring-2009/pages/related-resources/drawing_and_sketching/) explains section lining and view selection.
 
 ## Attach each balloon to one item
 

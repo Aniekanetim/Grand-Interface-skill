@@ -33,6 +33,7 @@ function validate(config) {
     }
   }
   if (!Array.isArray(config.modelScripts) || !config.modelScripts.length) throw Error('Provide model scripts defining self.DrawingModels');
+  if (typeof config.dependencies !== 'string') throw Error('Set dependencies to the folder holding node_modules packages, such as "node_modules"');
 }
 
 function build(configPath, outputPath) {

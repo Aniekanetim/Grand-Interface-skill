@@ -5,12 +5,13 @@ const RENDER_DELAY = 120;
 const viewport = $('viewport'), stage = $('stage'), drawing = $('drawing'), selection = $('selection'), selectionBox = $('selection-box');
 const palette = [['Graphite', '#202020'], ['Blue', '#3568b0'], ['Green', '#397362'], ['Terracotta', '#b25940'], ['Ochre', '#99752b'], ['Violet', '#805699']];
 const presets = {
-  technical: {outline: .35, edge: .22, detail: .13, texture: .09},
-  patent: {outline: .24, edge: .15, detail: .10, texture: .065},
-  service: {outline: .5, edge: .28, detail: .16, texture: 0}
+  technical: {outline: .35, edge: .22, detail: .13, texture: .09, axis: .13},
+  patent: {outline: .24, edge: .15, detail: .10, texture: .065, axis: .1},
+  service: {outline: .5, edge: .28, detail: .16, texture: 0, axis: .16}
 };
+const AXIS_DASH = '6 1 1 1';
 const geometryKeys = ['params', 'explosion', 'isolated'];
-const storageKey = 'object-studies-colors-v2';
+const storageKey = 'technical-drawing-colors-v2';
 
 const defaultInk = () => ({base: palette[0][1], parts: {}});
 const defaultParams = d => Object.fromEntries(d.parameters.map(p => [p.key, p.default]));
@@ -52,7 +53,8 @@ function createSvg(name, attributes = {}) {
 }
 
 function requestGeometry(subject, target, options) {
-  return renderer.request({id: subject.id, parameters: target.params, explosion: target.explosion, isolated: target.isolated}, options);
+  const fitExplosion = options?.preview && target.explosion ? Math.max(target.explosion, 1) : target.explosion;
+  return renderer.request({id: subject.id, parameters: target.params, explosion: target.explosion, fitExplosion, isolated: target.isolated}, options);
 }
 
 function mountGeometry(result, subject, target) {
@@ -86,6 +88,7 @@ function styleGeometry(group, preset, ink) {
     el.setAttribute('stroke-width', weight);
     el.setAttribute('stroke-linecap', 'butt');
     el.setAttribute('stroke-linejoin', 'round');
+    if (el.dataset.lineRole === 'axis') el.setAttribute('stroke-dasharray', AXIS_DASH);
     el.style.display = weight ? '' : 'none';
   }
 }
@@ -216,6 +219,7 @@ function choosePart(id) {
 function buildParameterControls() {
   $('parameters').replaceChildren();
   for (const id of ['parameter-divider', 'reset-parameters', 'parameter-note']) $(id).hidden = !selected.parameters.length;
+  $('concept-note').hidden = selected.concept === false;
   $('parameter-note').textContent = selected.parameterNote || 'Concept dimensions. Changes update matching parts in every view.';
   for (const p of selected.parameters) {
     const field = document.createElement('div');
@@ -266,8 +270,9 @@ function renderZoom(reset = false) {
   const w = SHEET.width * fit * zoom, h = SHEET.height * fit * zoom;
   drawing.style.width = w + 'px';
   drawing.style.height = h + 'px';
-  stage.style.width = Math.max(viewport.clientWidth, w + pad * 2) + 'px';
-  stage.style.height = Math.max(viewport.clientHeight, h + pad * 2) + 'px';
+  stage.style.width = w + pad * 2 + 'px';
+  stage.style.height = h + pad * 2 + 'px';
+  viewport.style.overflow = zoom > 1 ? 'auto' : 'hidden';
   $('zoom-level').value = Math.round(zoom * 100) + '%';
   $('zoom-out').disabled = zoom <= .25;
   $('zoom-in').disabled = zoom >= 4;
@@ -414,4 +419,5 @@ $('theme-toggle').addEventListener('click', () => DrawingTheme.set(DrawingTheme.
 $('appearance').addEventListener('change', event => DrawingTheme.set(event.target.value));
 
 $('subject').replaceChildren(...drawings.map(d => new Option(d.title, d.id)));
+$('subject').hidden = drawings.length === 1;
 selectDrawing(selected.id);

@@ -2,6 +2,11 @@ const assert=require('node:assert/strict');
 const G=require('../assets/geometry.js'),P=require('../assets/projection.js');
 const checks=[];
 function test(name,fn){fn();checks.push(name);}
+function segmentLengths(markup){
+ const lengths=[];
+ for(const [,d] of markup.matchAll(/ d="([^"]*)"/g))for(const run of d.split('M').filter(Boolean)){const points=run.split('L').map(p=>p.split(' ').map(Number));for(let i=1;i<points.length;i++)lengths.push(Math.hypot(points[i][0]-points[i-1][0],points[i][1]-points[i-1][1]));}
+ return lengths;
+}
 function meshIsClosed(p){
  const edges=new Map();
  for(const triangle of p.triangles)for(let j=0;j<3;j++){const a=triangle[j],b=triangle[(j+1)%3];assert.ok(a>=0&&a<p.vertices.length);const key=[a,b].sort((a,b)=>a-b).join(':');edges.set(key,(edges.get(key)||0)+1);}
@@ -56,7 +61,7 @@ test('Edge-on cylinder facets retain both long silhouettes at different resoluti
  for(const segments of[144,180,240]){
   const stem=G.part('stem','Upright stem');G.lathe(stem,[[0,3],[80,3],[80,0],[0,0]],{segments});
   const upright=([x,y,z])=>[y,z,x];stem.vertices=stem.vertices.map(upright);stem.lines=stem.lines.map(l=>({...l,a:upright(l.a),b:upright(l.b)}));
-  const markup=P.render([stem]).markup,lengths=[...markup.matchAll(/M([-\d.]+) ([-\d.]+)L([-\d.]+) ([-\d.]+)/g)].map(m=>Math.hypot(m[3]-m[1],m[4]-m[2]));
+  const markup=P.render([stem]).markup,lengths=segmentLengths(markup);
   assert.ok(lengths.filter(length=>length>200).length>=2,`Missing stem outlines with ${segments} segments`);
  }
 });
@@ -106,7 +111,7 @@ test('Paper anchors agree with rendered bounds after camera and explosion change
 test('Missing or invalid geometry fails before producing a blank NaN drawing',()=>{
  assert.throws(()=>P.render([G.part('empty','Empty')]),/finite vertices/);
  const p=G.part('broken','Broken');p.vertices.push([0,0,0],[NaN,1,2]);
- assert.throws(()=>P.render([p]),/finite vertices/);
+ assert.throws(()=>P.render([p]),/three finite coordinates/);
 });
 test('Small spring silhouettes are identical in millimeters and meters',()=>{
  const drawings=[1,.001].map(scale=>{
@@ -124,5 +129,104 @@ test('Submesh composition preserves indices, features and the complete part iden
  assert.equal(JSON.stringify(source),sourceBefore,'Merging must leave reusable source geometry unchanged');
  const targetBefore=JSON.stringify(target);G.transform(source,{origin:[100,0,0]});assert.equal(JSON.stringify(target),targetBefore,'Merged features must not alias their source');
  const moving=G.part('moving','Moving piece',[1,0,0]);assert.throws(()=>G.merge(target,moving),/zero explosion/);assert.throws(()=>G.merge(target,target),/itself/);
+});
+test('Lofts close and face outward whichever way their rings run',()=>{
+ const square=(h,z)=>[[h,-h,z],[h,h,z],[-h,h,z],[-h,-h,z]];
+ const volume=p=>p.triangles.reduce((sum,[a,b,c])=>sum+G.dot(p.vertices[a],G.cross(p.vertices[b],p.vertices[c])),0)/6;
+ for(const rings of[[square(2,0),square(1,3)],[square(1,3),square(2,0)],[square(2,0),square(1,3)].map(r=>[...r].reverse())]){
+  const p=G.part('frustum','Frustum');G.loft(p,rings);meshIsClosed(p);assert.ok(volume(p)>0,'Closed lofts wind toward their outside');
+ }
+ const ring=G.part('ring','Square ring');G.loft(ring,[square(3,0),square(3,1),square(2,1),square(2,0)],{cyclic:true});meshIsClosed(ring);assert.ok(volume(ring)>0);
+ assert.throws(()=>G.loft(ring,[square(1,0),square(1,1).slice(1)]),/equal point counts/);
+});
+test('Lathes reject crossing profiles and can skip rings on smooth curves',()=>{
+ assert.throws(()=>G.lathe(G.part('cell','Cell'),[[0,20],[10,20],[10,22],[5,19],[0,22]]),/intersect/);
+ const arc=Array.from({length:13},(_,i)=>{const t=Math.PI/2*i/12;return[6*Math.sin(t),6*Math.cos(t)+.001];});
+ const dome=G.part('dome','Dome');G.lathe(dome,[[0,0],...arc.map(([x,r])=>[x,r]),[6,0]],{creaseAngle:20});
+ const all=G.part('dome','Dome');G.lathe(all,[[0,0],...arc,[6,0]]);
+ assert.ok(dome.lines.length<all.lines.length/3,'Smooth profile vertices must not add rings');
+ const loft=G.part('band','Band'),square=(h,z)=>[[h,-h,z],[h,h,z],[-h,h,z],[-h,-h,z]];
+ G.loft(loft,[square(2,0),square(2,1),square(2,2)],{lines:'ends'});assert.equal(loft.lines.length,8);
+});
+test('Trails follow part explosions, hide behind solids and stay out of part groups',()=>{
+ const base=G.part('base','Base'),cap=G.part('cap','Cap',[0,0,30]),square=[[-5,-5],[5,-5],[5,5],[-5,5]];
+ G.extrude(base,square,{depth:4});G.extrude(cap,square,{depth:2});G.transform(cap,{origin:[0,0,4]});
+ const trails=[{a:[0,0,-10],b:[0,0,4],to:'base'},{a:[0,0,6],b:[0,0,6],from:'cap',to:'base'}];
+ const camera={azimuth:-120,elevation:30,roll:0},exploded=P.render([base,cap],{camera,trails}).markup;
+ const group=exploded.match(/<g data-trails="">([\s\S]*?)<\/g>/);assert.ok(group,'Trails render in their own group');
+ assert.ok(!group[0].includes('data-item')&&group[0].includes('data-line-role="axis"'));
+ assert.ok(!P.render([base,cap],{camera,trails,isolated:'cap'}).markup.includes('data-trails'),'Isolated parts omit trails');
+ assert.throws(()=>P.render([base,cap],{trails:[{a:[0,0,0],b:[0,0,1],to:'lid'}]}),/unknown part/);
+ const steady=P.render([base,cap],{camera,explosion:.5,fitExplosion:1}).scale,loose=P.render([base,cap],{camera,explosion:.5}).scale,full=P.render([base,cap],{camera,explosion:1}).scale;
+ assert.ok(Math.abs(steady-full)<1e-9&&loose>steady,'Fitting to the widest spacing keeps the scale steady');
+ const broken=G.part('broken','Broken');broken.vertices=[[0,0,0],[1,0,0]];broken.triangles=[[0,1,2]];
+ assert.throws(()=>P.render([broken]),/missing vertex/);
+});
+test('Rounded rings share sample angles so differently sized shells loft cleanly',()=>{
+ const angles=G.ringAngles(60,40,8),outer=G.roundedRing(60,40,8,{angles}),inner=G.roundedRing(56,36,6,{z:0,angles});
+ assert.equal(outer.length,inner.length);assert.ok(Math.abs(Math.max(...outer.map(p=>p[0]))-30)<1e-6&&Math.abs(Math.max(...outer.map(p=>p[1]))-20)<1e-6);
+ const shell=G.part('shell','Shell'),at=(ring,z)=>ring.map(([x,y])=>[x,y,z]);
+ G.loft(shell,[at(inner,0),at(outer,0),at(outer,10),at(inner,10)],{cyclic:true});meshIsClosed(shell);
+ const block=G.part('block','Block');G.box(block,[0,0,0],[10,6,3],{radius:1});meshIsClosed(block);
+ assert.equal(Math.max(...block.vertices.map(v=>v[0])),10);assert.equal(Math.max(...block.vertices.map(v=>v[2])),3);
+ const pin=G.transform(G.lathe(G.piece(),[[0,0],[0,1],[8,1],[8,0]]),{origin:[0,0,2],...G.along('z')});
+ assert.ok(Math.abs(Math.max(...pin.vertices.map(v=>v[2]))-10)<1e-9,'along(z) turns lathe X onto world Z');
+ for(const axis of['x','y','z'])G.transform(G.piece(),G.along(axis));
+ for(const name of['xy','xz','yz'])G.transform(G.piece(),G.plane(name));
+ const wall=G.transform(G.extrude(G.piece(),[[0,0],[10,0],[10,5],[0,5]],{depth:1}),G.plane('xz'));
+ assert.ok(Math.abs(Math.max(...wall.vertices.map(v=>v[2]))-5)<1e-9&&Math.min(...wall.vertices.map(v=>v[1]))===-1,'xz lays a profile upright with depth toward -y');
+});
+test('Open skins keep their rim, glass hides nothing and line-only parts still fit the page',()=>{
+ const camera={azimuth:-120,elevation:30,roll:0};
+ const skin=G.part('skin','Skin');skin.vertices=[[0,0,0],[10,0,0],[10,10,0],[0,10,0]];skin.triangles=[[0,1,2],[0,2,3]];
+ assert.ok(segmentLengths(P.render([skin],{camera}).markup).reduce((a,b)=>a+b,0)>100,'A free edge draws as an outline');
+ const dial=G.part('dial','Dial');G.box(dial,[-5,-5,0],[5,5,1]);
+ const glass=G.part('glass','Crystal');G.box(glass,[-12,-12,2],[12,12,3]);
+ const covered=P.render([dial,glass],{camera,explosion:0}).markup.match(/data-item="dial"[\s\S]*?<\/g>/)[0];
+ glass.transparent=true;
+ const seen=P.render([dial,glass],{camera,explosion:0}).markup.match(/data-item="dial"[\s\S]*?<\/g>/)[0];
+ assert.ok(segmentLengths(seen).reduce((a,b)=>a+b,0)>segmentLengths(covered).reduce((a,b)=>a+b,0)*2,'Transparent parts do not hide what is behind them');
+ const mark=G.part('mark','Mark');G.circle(mark,[0,0,0],4,[0,1,0]);assert.ok(mark.lines.every(l=>Math.abs(l.a[1])<1e-9));
+ assert.ok(P.render([mark],{camera}).markup.includes('data-item="mark"'));
+});
+test('Lathe points on the axis do not draw radial outlines',()=>{
+ const disc=G.part('disc','Disc');G.lathe(disc,[[0,0],[0,5],[1,5],[1,0]]);G.transform(disc,G.along('z'));
+ const {markup}=P.render([disc],{camera:{azimuth:-90,elevation:90,roll:0}}),points=[...markup.matchAll(/([-\d.]+) ([-\d.]+)/g)].map(m=>[+m[1],+m[2]]);
+ assert.ok(points.length>100,'Straight plan views keep the visible rim');
+ assert.ok(points.every(([x,y])=>Math.hypot(x-210,y-148.5)>50),'No ink reaches the centre of a solid disc seen face on');
+});
+test('Lathes turn onto other axes and sweeps close into tubes and rings',()=>{
+ const disc=G.part('disc','Disc');G.lathe(disc,[[0,0],[0,5],[2,5],[2,0]],{axis:'z',at:[1,2,3]});meshIsClosed(disc);
+ assert.ok(Math.abs(Math.max(...disc.vertices.map(v=>v[2]))-5)<1e-9&&Math.abs(Math.max(...disc.vertices.map(v=>v[0]))-6)<1e-6);
+ const section=Array.from({length:12},(_,i)=>[Math.cos(i*Math.PI/6),Math.sin(i*Math.PI/6)]);
+ const handle=G.part('handle','Handle');G.sweep(handle,[[0,0,0],[10,0,0],[14,0,4],[14,0,20]],section);meshIsClosed(handle);
+ const ring=G.part('ring','Key ring');G.sweep(ring,Array.from({length:48},(_,i)=>[10*Math.cos(i*Math.PI/24),10*Math.sin(i*Math.PI/24),0]),section,{closed:true});meshIsClosed(ring);
+ for(const v of ring.vertices)assert.ok(Math.abs(Math.hypot(Math.hypot(v[0],v[1])-10,v[2])-1)<1e-6,'A closed sweep keeps its tube radius');
+});
+test('Extrusions cut real holes that stay open through the part',()=>{
+ const disc=(cx,cy,r,n=24)=>Array.from({length:n},(_,i)=>[cx+r*Math.cos(2*Math.PI*i/n),cy+r*Math.sin(2*Math.PI*i/n)]);
+ const lever=G.part('lever','Lever');G.extrude(lever,[[0,-4],[40,-4],[40,4],[0,4]],{depth:2,holes:[disc(6,0,2),disc(34,0,1.5,16)]});meshIsClosed(lever);
+ const volume=lever.triangles.reduce((sum,[a,b,c])=>sum+G.dot(lever.vertices[a],G.cross(lever.vertices[b],lever.vertices[c])),0)/6;
+ const expected=(320-Math.PI*4*0.98-Math.PI*2.25*0.97)*2;assert.ok(Math.abs(volume-expected)<1.5,`Volume ${volume} should drop by the holes`);
+ const plain=G.part('lever','Lever');G.extrude(plain,[[0,-4],[40,-4],[40,4],[0,4]],{depth:2});
+ const ink=part=>segmentLengths(P.render([part],{camera:{azimuth:-90,elevation:90,roll:0}}).markup).reduce((a,b)=>a+b,0);
+ assert.ok(ink(lever)>ink(plain)*1.15,'Hole rims draw in a plan view');
+ assert.throws(()=>G.extrude(G.part('bad','Bad'),[[0,0],[4,0],[4,4],[0,4]],{depth:1,holes:[disc(10,10,1)]}),/inside the profile/);
+ const rear=G.ringPoints([10,14,0],6,[1,0,0],[0,1,0],{start:Math.PI/2,end:Math.PI}).map(([x,y])=>[x,y]);
+ for(const count of[12,24,48,96]){const wall=G.part('wall','Wall');G.extrude(wall,[[4,11],[120,11],[120,20],...rear],{depth:.8,holes:[disc(10,14,1.6,count).map(([x,y])=>[x,y])]});meshIsClosed(wall);}
+ let seed=7;const random=()=>(seed=(seed*16807)%2147483647)/2147483647;
+ for(let k=0;k<40;k++){
+  const w=20+random()*60,h=10+random()*30,r=Math.min(w,h)/2*random(),count=8+Math.floor(random()*40);
+  const holes=[0,1].map(()=>disc((random()-.5)*(w-12),h/2+(random()-.5)*(h-12),1+random()*2,count)).filter((c,i,all)=>i===0||Math.hypot(c[0][0]-all[0][0][0],c[0][1]-all[0][0][1])>8);
+  const plate=G.part('plate','Plate');G.extrude(plate,G.roundedRectangle(w,h,r),{depth:1,holes});meshIsClosed(plate);
+ }
+});
+test('Closed sweeps meet without a twist on a three-dimensional loop and screws take defaults',()=>{
+ const path=Array.from({length:180},(_,i)=>{const t=i*2*Math.PI/180;return[Math.sin(t)+2*Math.sin(2*t),Math.cos(t)-2*Math.cos(2*t),-Math.sin(3*t)].map(n=>n*10);});
+ const square=[[-1,-1],[1,-1],[1,1],[-1,1]],knot=G.part('knot','Knot');G.sweep(knot,path,square,{closed:true});meshIsClosed(knot);
+ const ring=i=>knot.vertices.slice(i*4,i*4+4),turnBetween=(a,b)=>Math.max(...a.map((v,k)=>Math.hypot(...G.sub(v,b[k]))));
+ const seam=turnBetween(ring(179),ring(0)),step=turnBetween(ring(0),ring(1));
+ assert.ok(seam<step*1.2,'The seam band twists no more than its neighbours');
+ meshIsClosed(G.screw(G.part('screw','Screw')));
 });
 console.log(JSON.stringify({passed:checks.length,checks},null,2));
