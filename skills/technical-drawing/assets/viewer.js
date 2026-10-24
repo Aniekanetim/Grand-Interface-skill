@@ -7,7 +7,7 @@ const GRAPHITE = '#202020', DEFAULT_HUE = 250, HUE_INK = {lightness: .52, chroma
 const geometryKeys = ['params', 'explosion', 'isolated'];
 const storageKey = 'technical-drawing-colors-v3';
 
-const defaultInk = () => ({base: null, parts: {}});
+const defaultInk = () => ({base: null, parts: {}, fill: {base: false, parts: {}}});
 const defaultParams = d => Object.fromEntries(d.parameters.map(p => [p.key, p.default]));
 const previewFit = explosion => explosion && Math.max(explosion, 1);
 
@@ -23,6 +23,9 @@ function inkFromHue(hue) {
   }).join('');
 }
 const inkColor = hue => hue === null ? GRAPHITE : inkFromHue(hue);
+const isFilled = (ink, part) => ink.fill.parts[part] ?? ink.fill.base;
+const hasFill = ink => ink.fill.base || Object.values(ink.fill.parts).some(Boolean);
+const tint = hex => '#' + [1, 3, 5].map(i => Math.round(255 - (255 - parseInt(hex.slice(i, i + 2), 16)) * .18).toString(16).padStart(2, '0')).join('');
 const resolveInk = ink => ({base: inkColor(ink.base), parts: Object.fromEntries(Object.entries(ink.parts).map(([part, hue]) => [part, inkFromHue(hue)]))});
 const HUE_STOPS = Array.from({length: 13}, (_, i) => inkFromHue(i * 30)).join(', ');
 const initialState = d => ({
@@ -44,7 +47,11 @@ const renderer = DrawingRenderQueue.create(new Worker(workerUrl));
 URL.revokeObjectURL(workerUrl);
 
 const state = () => states.get(selected.id);
-const colors = () => preferences[selected.id] ??= defaultInk();
+function colors() {
+  const ink = preferences[selected.id] ??= defaultInk();
+  ink.fill ??= defaultInk().fill;
+  return ink;
+}
 
 function save() {
   try { localStorage.setItem(storageKey, JSON.stringify(preferences)); } catch {}
@@ -63,7 +70,7 @@ function createSvg(name, attributes = {}) {
 }
 
 function requestGeometry(subject, target, fitExplosion, options) {
-  return renderer.request({id: subject.id, parameters: target.params, explosion: target.explosion, fitExplosion, isolated: target.isolated}, options);
+  return renderer.request({id: subject.id, parameters: target.params, explosion: target.explosion, fitExplosion, isolated: target.isolated, fill: target.fill}, options);
 }
 
 function mountGeometry(result, subject, target) {
@@ -82,8 +89,20 @@ function mountGeometry(result, subject, target) {
   return {node, group};
 }
 
-function styleGeometry(group, preset, ink) {
+function styleGeometry(group, preset, ink, fills) {
   const weights = SHEET.linework[preset], inkFor = el => ink.parts[el.closest('[data-item]')?.dataset.item] || ink.base;
+  for (const el of group.querySelectorAll('[data-fill]')) {
+    const color = ink.parts[el.dataset.fill] || ink.base, filled = isFilled(fills, el.dataset.fill);
+    const paper = !filled && (el.dataset.covers || '').split(' ').some(part => isFilled(fills, part));
+    const paint = filled ? tint(color) : paper ? 'white' : 'none';
+    el.style.setProperty('--drawing-ink', color);
+    if (filled || paper) el.dataset.filled = filled ? 'tint' : 'paper';
+    else delete el.dataset.filled;
+    el.setAttribute('fill', paint);
+    el.setAttribute('stroke', paint);
+    el.setAttribute('stroke-width', .1);
+    el.setAttribute('stroke-linejoin', 'round');
+  }
   group.style.setProperty('--drawing-ink', ink.base);
   for (const part of group.querySelectorAll('[data-item]')) part.style.setProperty('--drawing-ink', ink.parts[part.dataset.item] || ink.base);
   for (const el of group.querySelectorAll('[data-ink-fill]')) {
@@ -106,6 +125,11 @@ function stripPreviewHooks(node) {
   node.removeAttribute('role');
   node.removeAttribute('aria-labelledby');
   for (const el of node.querySelectorAll('[data-ink-fill]')) el.removeAttribute('data-ink-fill');
+  for (const el of node.querySelectorAll('[data-fill]')) {
+    if (el.getAttribute('fill') === 'none') el.remove();
+    el.removeAttribute('data-covers');
+    el.removeAttribute('data-filled');
+  }
   for (const el of node.querySelectorAll('[style]')) {
     el.style.removeProperty('--drawing-ink');
     if (!el.style.length) el.removeAttribute('style');
@@ -124,12 +148,12 @@ async function render(delay = 0) {
   const subject = selected;
   setDrawingStatus('rendering');
   try {
-    const target = structuredClone(state());
+    const target = {...structuredClone(state()), fill: hasFill(colors())};
     const mounted = mountGeometry(await requestGeometry(subject, target, previewFit(target.explosion), {preview: true, delay}), subject, target);
     svg = mounted.node;
     geometry = mounted.group;
     drawing.replaceChildren(svg, selection);
-    styleGeometry(geometry, state().preset, resolveInk(colors()));
+    styleGeometry(geometry, state().preset, resolveInk(colors()), colors());
     document.title = subject.title + ' · Technical drawing';
     setDrawingStatus('ready');
     updateSelection();
@@ -150,14 +174,17 @@ function update(patch, {delay = 0} = {}) {
 }
 
 function restyle() {
-  if (geometry) styleGeometry(geometry, state().preset, resolveInk(colors()));
+  if (geometry) styleGeometry(geometry, state().preset, resolveInk(colors()), colors());
   updateSelection();
   updateColorControls();
 }
 
 function editColors(change) {
+  const filled = hasFill(colors());
   change(colors());
-  restyle();
+  if (hasFill(colors()) !== filled) render();
+  else restyle();
+  updateColorControls();
   save();
 }
 
@@ -211,6 +238,9 @@ function updateColorControls() {
   const target = $('color-target').value, c = colors(), hue = target === 'all' ? c.base : (c.parts[target] ?? c.base);
   const mixed = target === 'all' && Object.values(c.parts).some(value => value !== c.base);
   $('hue').value = (mixed ? null : hue) ?? DEFAULT_HUE;
+  const fills = target === 'all' ? [c.fill.base, ...Object.values(c.fill.parts)] : [isFilled(c, target)];
+  $('fill').checked = fills.every(Boolean);
+  $('fill').indeterminate = !$('fill').checked && fills.some(Boolean);
   $('color-dot').style.background = Object.keys(c.parts).length ? `conic-gradient(${HUE_STOPS})` : inkColor(c.base);
 }
 
@@ -318,14 +348,14 @@ async function download(format, partOnly = false) {
   if (drawingStatus !== 'ready' || exportBusy) return;
   exportBusy = true;
   updateAvailability();
-  const subject = selected, target = structuredClone(state()), ink = resolveInk(colors());
+  const subject = selected, target = {...structuredClone(state()), fill: hasFill(colors())}, fills = structuredClone(colors().fill), ink = resolveInk(colors());
   const crop = partOnly || $('tight-crop').checked, transparent = $('transparent').checked;
   try {
     let source;
     if (partOnly) {
       target.isolated = target.selectedPart;
       const mounted = mountGeometry(await requestGeometry(subject, target, target.explosion), subject, target);
-      styleGeometry(mounted.group, target.preset, ink);
+      styleGeometry(mounted.group, target.preset, ink, {fill: fills});
       source = mounted.node;
     } else {
       source = svg.cloneNode(true);
@@ -340,7 +370,8 @@ async function download(format, partOnly = false) {
     ].filter(Boolean).join('-');
     const metadata = {
       subject: subject.id, concept: subject.concept !== false, parameters: target.params, explosion: target.explosion,
-      linework: target.preset, isolated: target.isolated, colors: ink
+      linework: target.preset, isolated: target.isolated, colors: ink,
+      fills: subject.parts.map(p => p.id).filter(id => isFilled({fill: fills}, id))
     };
     await DrawingExport.save(stripPreviewHooks(source), format, {filename, crop, transparent, metadata});
     announce(format.toUpperCase() + ' saved');
@@ -383,14 +414,21 @@ $('color-part').addEventListener('click', () => {
 $('download-part').addEventListener('click', () => download('svg', true));
 drawing.addEventListener('click', event => {
   if (drawingStatus === 'rendering') return;
-  const part = event.target.closest('[data-item]');
+  const part = event.target.closest('[data-item]')?.dataset.item ?? event.target.closest('[data-filled=tint]')?.dataset.fill;
   if (!part) return;
-  choosePart(part.dataset.item);
+  choosePart(part);
   $('parts-panel').showPopover();
 });
 
 $('color-target').addEventListener('change', updateColorControls);
 $('hue').addEventListener('input', event => setHue(Number(event.target.value)));
+$('fill').addEventListener('change', event => {
+  const target = $('color-target').value, filled = event.target.checked;
+  editColors(c => {
+    if (target === 'all') c.fill = {base: filled, parts: {}};
+    else c.fill.parts[target] = filled;
+  });
+});
 $('reset-colors').addEventListener('click', () => editColors(c => Object.assign(c, defaultInk())));
 
 $('zoom-in').addEventListener('click', () => setZoom(zoom * 1.25));

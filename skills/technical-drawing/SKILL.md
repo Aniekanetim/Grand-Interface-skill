@@ -78,7 +78,7 @@ This step is done when corresponding features agree across views and every separ
 
 ## 4. Ink the drawing and add requested annotations
 
-With the bundled viewer, the renderer and viewer already ink line roles at paper size. Identify illustrative construction in the drawing's `description` and leave its `concept` flag on.
+With the bundled viewer, the renderer and viewer already ink line roles at paper size, and the color panel fills any part with a tint of its line color. Identify illustrative construction in the drawing's `description` and leave its `concept` flag on.
 
 For an annotated sheet or an export without the viewer, read [sheet-and-svg.md](sheet-and-svg.md) and compose the sheet to it.
 
@@ -115,6 +115,7 @@ This step is done when the available controls work and every download preserves 
 | A title block claims a scale the fitted view cannot preserve | Use `NTS`, or compute and verify the physical output scale |
 | A photograph becomes an unexplained detailed interior | Remove unsupported construction or mark it as illustrative |
 | Slots merge into black bars in the preview | Enlarge the view, simplify the feature or make a detail inset |
+| A filled part loses patches of its fill | Close each shell and wind its triangles consistently |
 
 ## Deliver the drawing with its source
 

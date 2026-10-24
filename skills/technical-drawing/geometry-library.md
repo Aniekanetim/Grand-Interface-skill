@@ -109,7 +109,7 @@ const {render} = require('./tools/technical-drawing/assets/projection.js');
 const {markup} = render([sleeve], {explosion: 0.6, isolated: null});
 ```
 
-The model owns its camera. The viewer passes only `explosion`, `fitExplosion` and `isolated`, so spread those options and add the camera:
+The model owns its camera. The viewer passes only `explosion`, `fitExplosion`, `isolated` and `fill`, so spread those options and add the camera:
 
 ```js
 return TechnicalProjection.render(parts, {...options, camera: {azimuth: -128, elevation: 30, roll: 0}});
@@ -128,6 +128,10 @@ Coordinates fit a landscape A3 page with a 28 mm margin, which is the paper spac
 `fitExplosion` fits the page to a wider spacing than the current one. Above zero spacing the viewer previews with at least the authored spacing of 1, so the scale holds while the slider moves below it. `isolated` accepts one part ID or `null`.
 
 The `sample` option sets visibility sampling in paper millimeters, 0.045 by default within 0.01–0.2. Depth tolerance tracks 0.01 mm on paper, so inspect shallow recesses and nearly touching faces closely.
+
+`fill: true` adds a `data-fills` group behind every part. Each path in it carries `data-fill` with its part ID and `data-covers` with the parts it paints over, and starts with `fill="none"` until the viewer colors it. Paths paint far to near, and a part fully hidden behind others gets none.
+
+Fills rely on closed shells. A closed shell hides its own back faces whichever way its triangles wind, while an open skin fills both sides. Fills roughly double render time, so the viewer requests them only while a part is filled.
 
 Regenerate visibility after changing geometry, spacing or isolation. Previously hidden segments cannot be recovered by moving or hiding already-clipped SVG groups.
 

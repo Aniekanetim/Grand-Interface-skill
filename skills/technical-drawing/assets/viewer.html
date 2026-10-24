@@ -77,6 +77,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, #viewport:focus
 #drawing [data-ink-fill] { fill: var(--drawing-ink); }
 :root[data-theme=dark] #drawing [data-line-role] { stroke: color-mix(in srgb, var(--drawing-ink), white 60%); }
 :root[data-theme=dark] #drawing [data-ink-fill] { fill: color-mix(in srgb, var(--drawing-ink), white 60%); }
+#drawing [data-filled=paper] { fill: var(--page); stroke: var(--page); }
+#drawing [data-filled=tint] { --tint: color-mix(in srgb, var(--drawing-ink) 18%, var(--page)); fill: var(--tint); stroke: var(--tint); cursor: pointer; }
+:root[data-theme=dark] #drawing [data-filled=tint] { --tint: color-mix(in srgb, color-mix(in srgb, var(--drawing-ink), white 60%) 24%, var(--page)); }
 #selection { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
 #selection-box { stroke: var(--focus); }
 
@@ -252,9 +255,10 @@ body:has(#download-panel:popover-open) #download-toggle { background: rgb(255 25
 <button id="reset-drawing" aria-label="Reset drawing"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 9.5a6 6 0 1 1 1.8 4.3M4 4.5v5h5"/></svg></button>
 </div>
 <div id="color-panel" popover="auto" aria-label="Drawing colors">
-<div class="panel-heading">Line color<button class="close" popovertarget="color-panel" popovertargetaction="hide" aria-label="Close color controls">×</button></div>
+<div class="panel-heading">Color<button class="close" popovertarget="color-panel" popovertargetaction="hide" aria-label="Close color controls">×</button></div>
 <div class="field"><label for="color-target">Apply to</label><select id="color-target"><option value="all">All parts</option></select></div>
 <input id="hue" class="hue" type="range" min="0" max="360" step="1" aria-label="Line hue">
+<label class="check-field"><input id="fill" type="checkbox">Fill</label>
 <div class="action-row"><button id="reset-colors">Reset colors</button></div>
 </div>
 <div id="settings-panel" popover="auto" aria-label="Drawing settings">

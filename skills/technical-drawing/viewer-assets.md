@@ -44,7 +44,7 @@ The builder embeds those packages, the Inter font and its license. The generated
 
 Each model script registers a function in `self.DrawingModels`, keyed by drawing ID. The worker already provides `TechnicalGeometry` and `TechnicalProjection`.
 
-The worker calls each model with the parameter values and `{explosion, fitExplosion, isolated}`.
+The worker calls each model with the parameter values and `{explosion, fitExplosion, isolated, fill}`.
 
 Preserve existing registrations when the viewer includes multiple model scripts.
 
@@ -71,7 +71,9 @@ Mark filled ink, including engraved text and arrowheads, with `data-ink-fill`. T
 
 Keep occluding faces unmarked and explicitly paper-colored. A filled-ink marker identifies content to recolor, not every closed surface.
 
-Return coordinates in millimeters on the 420 × 297 mm sheet. `TechnicalProjection.render` already fits them, and the viewer draws them unscaled. `render` applies each part's explosion vector scaled by `explosion` and drops parts outside `isolated`, so models pass both options through. Handle them in the model only when spacing or isolation changes the geometry itself.
+Part fills come from `render` with `fill: true`. A different renderer that supports them returns one `data-fills` group before the parts, holding paths with `data-fill` and `data-covers` as **Project visible ink from the mesh** in [geometry-library.md](geometry-library.md) describes.
+
+Return coordinates in millimeters on the 420 × 297 mm sheet. `TechnicalProjection.render` already fits them, and the viewer draws them unscaled. `render` applies each part's explosion vector scaled by `explosion`, drops parts outside `isolated` and draws fills for `fill`, so models pass all three through. Handle them in the model only when spacing or isolation changes the geometry itself.
 
 Treat model code as generator source you control. Remove scripts and external resources from imported SVG before it reaches this boundary.
 
@@ -95,7 +97,7 @@ For every build, run `node tools/technical-drawing/scripts/check-viewer.cjs dist
 
 The page renders in a worker, so a plain headless screenshot taken at load shows an empty page. Interactive checks beyond the script need a DevTools driver that waits until `#render-status` reads `Drawing updated`.
 
-The bundled controls and appearance are the skill's own code and are tested with it, so test what this drawing adds. Open the generated page from disk and change whole-drawing and individual-part colors, then switch views where available. Download after zooming and scrolling, confirming that every format preserves the complete selected view and its colors.
+The bundled controls and appearance are the skill's own code and are tested with it, so test what this drawing adds. Open the generated page from disk and change whole-drawing and individual-part colors, fill one part and then every part, then switch views where available. Download after zooming and scrolling, confirming that every format preserves the complete selected view and its colors.
 
 Check full-page, cropped, transparent and isolated-part exports. Verify PNG pixel dimensions and alpha, plus PDF page count, physical size and vector content. Render the downloaded PDF independently and inspect its labels, fine lines and sheet edges.
 

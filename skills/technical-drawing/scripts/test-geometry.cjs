@@ -7,7 +7,7 @@ function test(name, fn) {
 }
 function segmentLengths(markup) {
   const lengths = [];
-  for (const [, d] of markup.matchAll(/ d="([^"]*)"/g))
+  for (const [, d] of markup.matchAll(/data-line-role="[^"]*" fill="none" d="([^"]*)"/g))
     for (const run of d.split('M').filter(Boolean)) {
       const points = run.split('L').map(p => p.split(' ').map(Number));
       for (let i = 1; i < points.length; i++) lengths.push(Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]));
@@ -473,5 +473,33 @@ test('Feature lines own their endpoints and part IDs are strings', () => {
   assert.ok(nut.lines.every(l => l.role === 'detail'));
   const radii = nut.lines.map(l => Math.hypot(l.a[1], l.a[2]));
   assert.ok(Math.abs(Math.max(...radii) - 5) < 1e-9 && Math.abs(Math.min(...radii) - 5 * Math.cos(Math.PI / 6)) < 1e-9, 'A hex ring has flats');
+});
+test('Fills cover each part once, behind its ink and in depth order', () => {
+  const camera = {azimuth: -120, elevation: 30, roll: 0};
+  const back = G.part('back', 'Back block');
+  G.box(back, [0, 0, 0], [20, 20, 5]);
+  const front = G.part('front', 'Front block');
+  G.box(front, [5, 5, 10], [15, 15, 15]);
+  const hidden = G.part('hidden', 'Hidden core');
+  G.box(hidden, [8, 8, 1], [12, 12, 4]);
+  const tube = G.part('tube', 'Inward-wound tube');
+  G.lathe(tube, [[0, 3], [5, 3], [5, 1.25], [0, 1.25]]);
+  G.transform(tube, {origin: [30, 10, 0], ...G.along('z')});
+  const parts = [back, front, hidden, tube];
+  assert.ok(!P.render(parts, {camera}).markup.includes('data-fills'), 'Fills are drawn only on request');
+  const {markup} = P.render(parts, {camera, fill: true});
+  assert.ok(markup.indexOf('data-fills') < markup.indexOf('data-item'), 'Fills sit behind every part');
+  const fills = [...markup.matchAll(/data-fill="([^"]*)" data-covers="([^"]*)"/g)].map(m => ({id: m[1], covers: m[2].split(' ').filter(Boolean)}));
+  assert.deepEqual(fills.map(f => f.id).sort(), ['back', 'front', 'tube'], 'A fully hidden part draws no fill');
+  assert.ok(fills.find(f => f.id === 'front').covers.includes('back'), 'A nearer part records the parts it paints over');
+  assert.ok(fills.findIndex(f => f.id === 'back') < fills.findIndex(f => f.id === 'front'), 'Farther fills paint first');
+  const area = id => {
+    const d = markup.match(new RegExp(`data-fill="${id}"[^>]* d="([^"]*)"`))[1];
+    return d.split('M').filter(Boolean).reduce((sum, loop) => {
+      const p = loop.replace('Z', '').split('L').map(q => q.split(' ').map(Number));
+      return sum + p.reduce((s, q, i) => s + q[0] * p[(i + 1) % p.length][1] - p[(i + 1) % p.length][0] * q[1], 0) / 2;
+    }, 0);
+  };
+  assert.ok(area('tube') > 1, 'An inward-wound closed shell still fills its silhouette');
 });
 console.log(JSON.stringify({passed: checks.length, checks}, null, 2));
