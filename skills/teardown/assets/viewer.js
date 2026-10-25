@@ -5,7 +5,7 @@ const RENDER_DELAY = 120;
 const viewport = $('viewport'), stage = $('stage'), drawing = $('drawing'), selection = $('selection'), selectionBox = $('selection-box');
 const GRAPHITE = '#202020', DEFAULT_HUE = 250, HUE_INK = {lightness: .52, maxChroma: .2};
 const geometryKeys = ['params', 'explosion', 'isolated', 'annotate'];
-const storageKey = 'technical-drawing-colors-v4';
+const storageKey = 'teardown-colors';
 
 const defaultInk = d => ({
   base: null,

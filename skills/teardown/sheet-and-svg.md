@@ -90,7 +90,7 @@ Paste `render` markup into `views` as it comes out. Its paths carry `data-line-r
 Generate the role rules where the shell's comment sits, from the sheet module rather than copied numbers:
 
 ```js
-const SHEET = require('./tools/technical-drawing/assets/sheet.js');
+const SHEET = require('./tools/teardown/assets/sheet.js');
 const roles = SHEET.css('technical');
 ```
 

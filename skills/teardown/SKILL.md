@@ -1,9 +1,9 @@
 ---
-name: technical-drawing
+name: teardown
 description: Creates technical illustrations of physical objects and of how things work, such as display pixels or interface layers, with coherent views, fine linework and part fills.
 ---
 
-# Technical drawing
+# Teardown
 
 This skill creates technical illustrations from objects, descriptions, photographs, CAD models or concepts. It constructs the geometry, inspects the rendered drawing and packages a page for viewing, coloring and downloading it.
 
@@ -61,7 +61,7 @@ This step is done when each view has a purpose and a scale policy. Annotated she
 
 ## 3. Construct one object, then project it
 
-Set up the project before modeling. Copy the skill's `assets/` and `scripts/` folders into `tools/technical-drawing/`, leaving out the `test-*.cjs` files, which check the skill itself. Write `drawing.json` and a model script as [viewer-assets.md](viewer-assets.md) describes under **Describe the drawings and their controls** and **Implement the model boundary**.
+Set up the project before modeling. Copy the skill's `assets/` and `scripts/` folders into `tools/teardown/`, leaving out the `test-*.cjs` files, which check the skill itself. Write `drawing.json` and a model script as [viewer-assets.md](viewer-assets.md) describes under **Describe the drawings and their controls** and **Implement the model boundary**.
 
 Derive every view from one model, including the parts list when the drawing needs one. Read [geometry.md](geometry.md) before modeling, since its rules apply whatever builds the geometry. For a concept, also read its **Draw concepts as layered parts** section.
 

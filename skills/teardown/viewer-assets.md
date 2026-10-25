@@ -90,7 +90,7 @@ Treat model code as generator source you control. Remove scripts and external re
 Run [scripts/build-viewer.cjs](scripts/build-viewer.cjs) with the configuration and destination:
 
 ```sh
-node tools/technical-drawing/scripts/build-viewer.cjs drawing.json dist/index.html
+node tools/teardown/scripts/build-viewer.cjs drawing.json dist/index.html
 ```
 
 Deliver the resulting HTML alongside `evidence.md`, the configuration, model scripts, dependency lockfile and copies of the skill's `assets/` and `scripts/` folders kept side by side.
@@ -101,7 +101,7 @@ A newer preview supersedes queued and running ones, and slider input is debounce
 
 ## Test the controls and the downloaded bytes
 
-For every build, run `node tools/technical-drawing/scripts/check-viewer.cjs dist/index.html check/` from the project folder, with Node 22 or later. It opens the page from disk in headless Chrome, waits for each drawing, screenshots it and fails on errors, missing parts or network requests. Add `--dark` to check the dark appearance.
+For every build, run `node tools/teardown/scripts/check-viewer.cjs dist/index.html check/` from the project folder, with Node 22 or later. It opens the page from disk in headless Chrome, waits for each drawing, screenshots it and fails on errors, missing parts or network requests. Add `--dark` to check the dark appearance.
 
 The page renders in a worker, so a plain headless screenshot taken at load shows an empty page. Interactive checks beyond the script need a DevTools driver that waits until `#render-status` reads `Drawing updated`.
 
