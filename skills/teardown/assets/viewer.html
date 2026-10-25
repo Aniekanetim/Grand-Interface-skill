@@ -74,6 +74,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, #viewport:focus
 #drawing { flex: none; position: relative; }
 #drawing > svg { display: block; width: 100%; height: 100%; }
 #drawing [data-item] { cursor: pointer; }
+#drawing[data-playing] :is([data-annotations], #selection) { display: none; }
+#drawing [data-leaving] { pointer-events: none; animation: annotation-leave .2s ease-out forwards; }
+@keyframes annotation-leave { to { opacity: 0; } }
 #drawing :is(#paper, [fill="white"], [fill="#fff"], [fill="#ffffff"]) { fill: var(--page); }
 #drawing [data-line-role] { stroke: var(--drawing-ink); }
 #drawing [data-ink-fill] { fill: var(--drawing-ink); }
@@ -291,5 +294,6 @@ body:has(#download-panel:popover-open) #download-toggle { background: rgb(255 25
 <script id="drawing-worker" type="application/json">__WORKER_SOURCE__</script>
 <script>__EXPORT_SCRIPT__</script>
 <script>__RENDER_QUEUE_SCRIPT__</script>
+<script>__FLIPBOOK_SCRIPT__</script>
 <script>__VIEWER_SCRIPT__</script>
 </body></html>

@@ -495,7 +495,7 @@
     }).join('');
   }
 
-  function annotator(anchors, bounds) {
+  function annotator(anchors, bounds, ink) {
     const GAP = 7, SIZE = 3.2, top = SHEET.margin, bottom = SHEET.height - SHEET.margin, middle = bounds.x + bounds.width / 2;
     const sides = [anchors.filter(a => a.center < middle), anchors.filter(a => a.center >= middle)];
     let markup = '';
@@ -505,14 +505,33 @@
       for (let i = 1; i < ys.length; i++) ys[i] = Math.max(ys[i], ys[i - 1] + GAP);
       const overflow = Math.max(0, (ys[ys.length - 1] ?? 0) - bottom);
       for (let i = ys.length - 1; i >= 0; i--) ys[i] = Math.min(ys[i] - overflow, i < ys.length - 1 ? ys[i + 1] - GAP : Infinity);
-      const direction = side ? 1 : -1, column = side ? bounds.x + bounds.width + 16 : bounds.x - 16, elbow = column - direction * 5;
+      const direction = side ? 1 : -1;
       list.forEach(({point: [x, y], name}, i) => {
+        const edge = reach(ink, ys[i] - SIZE, ys[i] + SIZE, side, x);
+        const column = edge + direction * 16, elbow = column - direction * 5;
         markup += `<path data-line-role="detail" fill="none" d="M${round(x)} ${round(y)}L${round(elbow)} ${round(ys[i])}L${round(column)} ${round(ys[i])}"/>`
           + `<circle data-ink-fill="" cx="${round(x)}" cy="${round(y)}" r=".6"/>`
           + `<text data-ink-fill="" data-annotation="" x="${round(column + direction * 1.5)}" y="${round(ys[i] + SIZE * .35)}" font-size="${SIZE}" text-anchor="${side ? 'start' : 'end'}">${escape(name.toUpperCase())}</text>`;
       });
     });
     return markup && `<g data-annotations="">${markup}</g>`;
+  }
+
+  // Ink arrives as segment end pairs, so a long edge passing the label's
+  // height has no point near it; clip each segment to the band instead.
+  function reach(ink, low, high, side, from) {
+    let far = from;
+    for (let k = 0; k < ink.length; k += 2) {
+      const [a, b] = [ink[k], ink[k + 1]], dy = b[1] - a[1];
+      const [t0, t1] = dy ? [(low - a[1]) / dy, (high - a[1]) / dy].sort((m, n) => m - n) : a[1] >= low && a[1] <= high ? [0, 1] : [1, 0];
+      const lo = Math.max(0, t0), hi = Math.min(1, t1);
+      if (lo > hi) continue;
+      for (const t of [lo, hi]) {
+        const x = a[0] + (b[0] - a[0]) * t;
+        far = side ? Math.max(far, x) : Math.min(far, x);
+      }
+    }
+    return far;
   }
 
   function anchorOf(part, points, middle) {
@@ -528,7 +547,7 @@
     return {name: part.name, point, center};
   }
 
-  function render(parts, {explosion = 1, isolated = null, sample = .045, camera, fitExplosion = explosion, trails = [], fill = false, annotate = false} = {}) {
+  function render(parts, {explosion = 1, isolated = null, sample = .045, camera, fitExplosion = explosion, trails = [], fill = false, annotate = false, labels = annotate} = {}) {
     for (const [name, value] of [['Explosion', explosion], ['Fit explosion', fitExplosion]]) {
       if (!Number.isFinite(value) || value < 0 || value > 2) throw Error(name + ' must be 0–2');
     }
@@ -574,7 +593,7 @@
     if (fillInk) groups.unshift(`<g data-fills="">${fillInk}</g>`);
     const trailInk = ink(current.trails.filter(t => !t.collapsed));
     if (trailInk) groups.push(`<g data-trails="">${trailInk}</g>`);
-    if (annotate) groups.push(annotator(inked.map(([part, points]) => anchorOf(part, points, bounds.x + bounds.width / 2)).filter(Boolean), bounds));
+    if (annotate && labels) groups.push(annotator(inked.map(([part, points]) => anchorOf(part, points, bounds.x + bounds.width / 2)).filter(Boolean), bounds, inked.flatMap(([, points]) => points)));
     return {markup: groups.join(''), bounds, scale, offset};
   }
 

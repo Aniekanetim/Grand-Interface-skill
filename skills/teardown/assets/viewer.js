@@ -1,7 +1,7 @@
 const drawings = JSON.parse(document.getElementById('drawing-data').textContent);
 const $ = id => document.getElementById(id), ns = 'http://www.w3.org/2000/svg';
 const SHEET = TechnicalSheet;
-const RENDER_DELAY = 120;
+const RENDER_DELAY = 120, PLAY_DURATION = 700;
 const viewport = $('viewport'), stage = $('stage'), drawing = $('drawing'), selection = $('selection'), selectionBox = $('selection-box');
 const GRAPHITE = '#202020', DEFAULT_HUE = 250, HUE_INK = {lightness: .52, maxChroma: .2};
 const geometryKeys = ['params', 'explosion', 'isolated', 'annotate'];
@@ -13,7 +13,7 @@ const defaultInk = d => ({
   filled: [...(d?.colors?.fills ?? [])]
 });
 const defaultParams = d => Object.fromEntries(d.parameters.map(p => [p.key, p.default]));
-const previewFit = explosion => explosion && Math.max(explosion, 1);
+const previewFit = explosion => Math.max(explosion, 1);
 
 function linearRgb(hue, chroma) {
   const angle = hue * Math.PI / 180, a = chroma * Math.cos(angle), b = chroma * Math.sin(angle);
@@ -55,11 +55,19 @@ let preferences = {};
 try { preferences = JSON.parse(localStorage.getItem(storageKey) || '{}'); } catch {}
 const states = new Map(drawings.map(d => [d.id, initialState(d)]));
 let selected = drawings.find(d => d.id === location.hash.slice(1)) || drawings[0];
-let zoom = 1, svg = null, geometry = null, drawingStatus = 'rendering', exportBusy = false, messageTimer;
+let zoom = 1, svg = null, geometry = null, drawingStatus = 'rendering', exportBusy = false, messageTimer, playback = null;
 
-const workerUrl = URL.createObjectURL(new Blob([JSON.parse($('drawing-worker').textContent)], {type: 'text/javascript'}));
-const renderer = DrawingRenderQueue.create(new Worker(workerUrl));
-URL.revokeObjectURL(workerUrl);
+const workerSource = new Blob([JSON.parse($('drawing-worker').textContent)], {type: 'text/javascript'});
+function spawnWorker() {
+  const url = URL.createObjectURL(workerSource), worker = new Worker(url);
+  URL.revokeObjectURL(url);
+  return worker;
+}
+const renderer = DrawingRenderQueue.create(spawnWorker());
+const flipbook = DrawingFlipbook.create(spawnWorker, {
+  size: Math.min(Math.max((navigator.hardwareConcurrency || 4) - 2, 2), 6),
+  ease: DrawingFlipbook.easeInOutCubic
+});
 
 const state = () => states.get(selected.id);
 function colors() {
@@ -162,10 +170,13 @@ function setDrawingStatus(status) {
 
 async function render(delay = 0) {
   const subject = selected;
+  stopPlayback();
   setDrawingStatus('rendering');
   try {
     const target = {...structuredClone(state()), fill: hasFill(colors())};
-    const mounted = mountGeometry(await requestGeometry(subject, target, previewFit(target.explosion), {preview: true, delay}), subject, target);
+    const result = await requestGeometry(subject, target, previewFit(target.explosion), {preview: true, delay});
+    if (playback) return;
+    const mounted = mountGeometry(result, subject, target);
     svg = mounted.node;
     geometry = mounted.group;
     drawing.replaceChildren(svg, selection);
@@ -174,12 +185,60 @@ async function render(delay = 0) {
     setDrawingStatus('ready');
     updateSelection();
     renderZoom();
+    if (subject.parts.length > 1 && target.isolated === null) {
+      flipbook.prepare(flipbookKey(subject, target), {id: subject.id, parameters: target.params, isolated: null, fill: target.fill, annotate: target.annotate});
+    }
   } catch (error) {
     if (error.name === 'AbortError') return;
     console.error(error);
     announce('Could not update the drawing. Restore the settings and try again.', true);
     setDrawingStatus('failed');
   }
+}
+
+const flipbookKey = (subject, target) => JSON.stringify([subject.id, target.params, target.fill, target.annotate]);
+
+function stopPlayback() {
+  if (!playback) return;
+  cancelAnimationFrame(playback.frame);
+  playback = null;
+  drawing.toggleAttribute('data-playing', false);
+  svg?.querySelector('[data-leaving]')?.remove();
+}
+
+function play(to) {
+  const s = state(), target = {...s, fill: hasFill(colors())};
+  const frames = s.isolated === null && geometry ? flipbook.ready(flipbookKey(selected, target)) : null;
+  if (!frames || matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+  if (!playback && s.explosion !== 0 && s.explosion !== 1) return false;
+  const last = frames.length - 1, start = playback?.value ?? s.explosion * last, end = to * last;
+  cancelAnimationFrame(playback?.frame);
+  svg.querySelector('[data-leaving]')?.remove();
+  const labels = to === 0 && !playback && geometry.querySelector('[data-annotations]');
+  if (labels) {
+    const leaving = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    leaving.setAttribute('data-leaving', '');
+    leaving.append(...labels.cloneNode(true).childNodes);
+    geometry.after(leaving);
+  }
+  const duration = PLAY_DURATION * Math.abs(end - start) / last;
+  const current = {value: start, frame: 0};
+  let began = null;
+  playback = current;
+  drawing.toggleAttribute('data-playing', true);
+  const step = now => {
+    began ??= now;
+    const progress = duration ? Math.min(1, (now - began) / duration) : 1;
+    current.value = start + (end - start) * progress;
+    geometry.innerHTML = frames[Math.round(current.value)];
+    styleGeometry(geometry, state().preset, resolveInk(colors()), colors());
+    if (progress < 1) current.frame = requestAnimationFrame(step);
+    else render();
+  };
+  // Switching into playback restyles the whole drawing. Starting the clock
+  // after that frame has painted keeps its cost from skipping frames.
+  current.frame = requestAnimationFrame(() => { current.frame = requestAnimationFrame(step); });
+  return true;
 }
 
 function update(patch, {delay = 0} = {}) {
@@ -406,7 +465,15 @@ $('hue').style.background = `linear-gradient(to right, ${HUE_STOPS})`;
 selection.setAttribute('viewBox', `0 0 ${SHEET.width} ${SHEET.height}`);
 
 $('subject').addEventListener('change', event => selectDrawing(event.target.value));
-const setView = option => update({explosion: option.dataset.view === 'assembled' ? 0 : 1});
+function setView(option) {
+  const explosion = option.dataset.view === 'assembled' ? 0 : 1;
+  if (!play(explosion)) {
+    update({explosion});
+    return;
+  }
+  state().explosion = explosion;
+  syncControls();
+}
 $('view').addEventListener('click', event => {
   const option = event.target.closest('[role=radio]');
   if (option) setView(option);
@@ -473,14 +540,15 @@ $('fill').addEventListener('change', event => {
 });
 $('reset-colors').addEventListener('click', () => editColors(c => Object.assign(c, defaultInk(selected))));
 
-$('zoom-in').addEventListener('click', () => setZoom(zoom * 1.25));
-$('zoom-out').addEventListener('click', () => setZoom(zoom / 1.25));
+const stepZoom = steps => setZoom((Math.round(zoom * 100) + steps * 5) / 100);
+$('zoom-in').addEventListener('click', () => stepZoom(1));
+$('zoom-out').addEventListener('click', () => stepZoom(-1));
 $('reset-drawing').addEventListener('click', resetDrawing);
 viewport.addEventListener('keydown', event => {
   if (!['+', '=', '-', '0'].includes(event.key)) return;
   event.preventDefault();
   if (event.key === '0') fitZoom();
-  else setZoom(event.key === '-' ? zoom / 1.25 : zoom * 1.25);
+  else stepZoom(event.key === '-' ? -1 : 1);
 });
 
 for (const panel of document.querySelectorAll('[popover]')) {

@@ -510,9 +510,11 @@ test('Annotations label each visible part beside the drawing', () => {
   G.box(cap, [5, 5, 2.1], [15, 15, 6]);
   assert.ok(!P.render([base, cap], {camera}).markup.includes('data-annotations'), 'Labels are drawn only on request');
   const {markup, bounds} = P.render([base, cap], {camera, annotate: true});
-  const labels = [...markup.matchAll(/<text[^>]* x="([^"]*)"[^>]*>([^<]*)<\/text>/g)];
-  assert.deepEqual(labels.map(m => m[2]).sort(), ['BASE PLATE', 'CAP'], 'Labels are the part names in capitals');
-  assert.ok(labels.every(([, x]) => +x < bounds.x || +x > bounds.x + bounds.width), 'Labels sit outside the drawing');
+  const labels = [...markup.matchAll(/<path[^>]* d="M([-\d.]+) [-\d.]+L[^"]*"\/>.*?<text[^>]* x="([^"]*)"[^>]*text-anchor="(\w+)"[^>]*>([^<]*)<\/text>/g)];
+  assert.deepEqual(labels.map(m => m[4]).sort(), ['BASE PLATE', 'CAP'], 'Labels are the part names in capitals');
+  assert.ok(labels.every(([, anchor, x, side]) => side === 'start' ? +x > +anchor : +x < +anchor), 'Labels sit beside their part, away from the drawing');
+  const capLabel = labels.find(m => m[4] === 'CAP');
+  assert.ok(+capLabel[2] > bounds.x && +capLabel[2] < bounds.x + bounds.width, 'A label hugs the drawing at its own height instead of the widest part');
   assert.ok(bounds.x >= 78 - 1e-6, 'The drawing leaves room for labels');
 });
 console.log(JSON.stringify({passed: checks.length, checks}, null, 2));
